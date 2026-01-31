@@ -1,0 +1,68 @@
+name: Sync MIGU IPTV Playlist
+
+on:
+  schedule:
+    # 每2小时运行一次
+    - cron: '0 */2 * * *'
+  workflow_dispatch:  # 允许手动触发
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Download and compare files
+        run: |
+          # 下载源文件
+          echo "Downloading source playlist..."
+          curl -s -L "https://github.com/ioptu/IPTV.txt2m3u.player/raw/refs/heads/main/migu.m3u" -o migu_new.m3u
+          
+          # 检查文件是否有效（非空）
+          if [ ! -s migu_new.m3u ]; then
+            echo "Error: Downloaded file is empty!"
+            exit 1
+          fi
+          
+          echo "Current file size: $(wc -l < iptv-fe.m3u) lines"
+          echo "New file size: $(wc -l < migu_new.m3u) lines"
+          
+          # 检查文件是否变化
+          if cmp -s iptv-fe.m3u migu_new.m3u; then
+            echo "✅ No changes detected"
+            rm migu_new.m3u
+            echo "skipped=true" >> $GITHUB_OUTPUT
+          else
+            echo "🔄 Changes detected, updating..."
+            # 备份旧文件（可选）
+            cp iptv-fe.m3u iptv-fe_backup_$(date +%Y%m%d_%H%M%S).m3u
+            # 更新文件
+            mv migu_new.m3u iptv-fe.m3u
+            echo "updated=true" >> $GITHUB_OUTPUT
+          fi
+        id: sync-check
+
+      - name: Commit and push if changed
+        if: steps.sync-check.outputs.updated == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git add iptv-fe.m3u
+          git commit -m "🔄 Auto-sync MIGU playlist from ioptu/IPTV.txt2m3u.player
+          
+          Sync time: $(date +'%Y-%m-%d %H:%M:%S UTC')
+          Source: https://github.com/ioptu/IPTV.txt2m3u.player"
+          
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

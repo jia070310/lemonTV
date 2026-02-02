@@ -1,8 +1,8 @@
 {
-  "last_commit_time": "2026-02-02T14:30:34",
-  "last_commit_sha": "ce3d81eb584859aed0ec94b6ee908064c1f56596",
-  "content_md5": "bf69915107ca688146c399ea04db82dc",
-  "last_sync_time": "2026-02-02T15:08:52.235064",
-  "next_sync_time": "2026-02-02T16:30:34",
-  "sync_reason": "远程文件已更新 (时间差 119.9 分钟, SHA 变化: True)"
+  "last_commit_time": "2026-02-02T16:30:34",
+  "last_commit_sha": "a6f37faff92e5f24acaabf68306082ceb7f6d26b",
+  "content_md5": "2126db7414b4b254bf48468074c85535",
+  "last_sync_time": "2026-02-02T17:10:38.535541",
+  "next_sync_time": "2026-02-02T18:30:34",
+  "sync_reason": "远程文件已更新 (时间差 120.0 分钟, SHA 变化: True)"
 }

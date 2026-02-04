@@ -1,96 +1,125 @@
-name: Sync IPTV File
+name: Auto Sync IPTV with Email
 
 on:
-  # 1. 定时触发（每30分钟检查一次）
+  # 每15分钟检查一次（比2小时更频繁）
   schedule:
-    - cron: '*/30 * * * *'
-  # 2. 手动触发（在GitHub网页上手动运行）
+    - cron: '*/15 * * * *'
+  # 支持手动立即触发
   workflow_dispatch:
-  # 3. 仓库推送时触发（可选）
-  push:
-    branches: [ main ]
 
 jobs:
-  sync-file:
+  sync-and-notify:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout your repository
+    # 步骤1：检出你的仓库
+    - name: Checkout your repo
       uses: actions/checkout@v4
       with:
         token: ${{ secrets.PAT_TOKEN }}
-        fetch-depth: 0
-
-    - name: Get current file hash (for comparison)
-      id: current_hash
+    
+    # 步骤2：检查当前文件哈希
+    - name: Check current file hash
+      id: hash_check
       run: |
         if [ -f "iptv-fe.m3u" ]; then
-          CURRENT_HASH=$(sha256sum iptv-fe.m3u | awk '{print $1}')
-          echo "current_hash=$CURRENT_HASH" >> $GITHUB_OUTPUT
-          echo "Current file hash: $CURRENT_HASH"
+          OLD_HASH=$(sha256sum iptv-fe.m3u | awk '{print $1}')
+          echo "old_hash=$OLD_HASH" >> $GITHUB_OUTPUT
+          echo "当前文件哈希: $OLD_HASH"
         else
-          echo "current_hash=none" >> $GITHUB_OUTPUT
-          echo "File does not exist yet"
+          echo "old_hash=none" >> $GITHUB_OUTPUT
+          echo "文件不存在，将创建新文件"
         fi
-
-    - name: Download latest source file
+    
+    # 步骤3：下载最新源文件
+    - name: Download latest file
       id: download
       run: |
         # 下载源文件
-        curl -s -L -o source.m3u "https://github.com/ioptu/IPTV.txt2m3u.player/raw/refs/heads/main/migu.m3u"
+        curl -s -L -o new-iptv.m3u "https://github.com/ioptu/IPTV.txt2m3u.player/raw/refs/heads/main/migu.m3u"
         
-        # 计算新文件的哈希值
-        NEW_HASH=$(sha256sum source.m3u | awk '{print $1}')
+        # 计算新文件哈希
+        NEW_HASH=$(sha256sum new-iptv.m3u | awk '{print $1}')
         echo "new_hash=$NEW_HASH" >> $GITHUB_OUTPUT
-        echo "New file hash: $NEW_HASH"
         
-        # 获取文件大小和行数信息
-        FILESIZE=$(stat -f%z source.m3u 2>/dev/null || stat -c%s source.m3u)
-        LINES=$(wc -l < source.m3u)
-        echo "Downloaded file: ${FILESIZE} bytes, ${LINES} lines"
-
-    - name: Check if file has changed
-      id: check
+        # 获取文件信息
+        FILESIZE=$(stat -f%z new-iptv.m3u 2>/dev/null || stat -c%s new-iptv.m3u)
+        LINES=$(wc -l < new-iptv.m3u)
+        echo "新文件大小: ${FILESIZE}字节, ${LINES}行"
+    
+    # 步骤4：比较并决定是否更新
+    - name: Compare files
+      id: compare
       run: |
-        if [ "${{ steps.current_hash.outputs.current_hash }}" == "${{ steps.download.outputs.new_hash }}" ]; then
-          echo "File has NOT changed. Skipping update."
+        if [ "${{ steps.hash_check.outputs.old_hash }}" == "${{ steps.download.outputs.new_hash }}" ]; then
           echo "changed=false" >> $GITHUB_OUTPUT
+          echo "文件未变化，跳过更新"
         else
-          echo "File HAS changed! Proceeding with update."
           echo "changed=true" >> $GITHUB_OUTPUT
+          echo "文件已变化，将进行更新"
         fi
-
-    - name: Update file and push to repository
-      if: steps.check.outputs.changed == 'true'
+    
+    # 步骤5：更新文件并推送
+    - name: Update and push
+      if: steps.compare.outputs.changed == 'true'
       run: |
-        # 更新文件
-        mv source.m3u iptv-fe.m3u
+        # 替换文件
+        mv new-iptv.m3u iptv-fe.m3u
         
         # 配置Git
-        git config --global user.name "GitHub Actions"
+        git config --global user.name "GitHub Actions Bot"
         git config --global user.email "actions@github.com"
         
         # 提交更改
         git add iptv-fe.m3u
-        git commit -m "Auto-sync IPTV: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        git commit -m "🔄 自动同步IPTV: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
         
-        Source: https://github.com/ioptu/IPTV.txt2m3u.player
-        Source Hash: ${{ steps.download.outputs.new_hash }}
-        Previous Hash: ${{ steps.current_hash.outputs.current_hash }}"
+        源文件: https://github.com/ioptu/IPTV.txt2m3u.player
+        新哈希: ${{ steps.download.outputs.new_hash }}
+        旧哈希: ${{ steps.hash_check.outputs.old_hash }}"
         
         # 推送更改
         git push origin main
         
-        echo "✅ Successfully updated iptv-fe.m3u"
-
-    - name: Send notification (optional)
-      if: steps.check.outputs.changed == 'true'
+        echo "✅ 文件更新成功，已推送至仓库"
+    
+    # 步骤6：发送邮件通知（仅在文件变化时）
+    - name: Send email notification
+      if: steps.compare.outputs.changed == 'true'
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 465
+        username: ${{ secrets.EMAIL_USER }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: "✅ IPTV文件已自动更新 - $(date -u '+%Y-%m-%d %H:%M') UTC"
+        to: ${{ secrets.NOTIFY_EMAIL }}
+        from: GitHub Actions <actions@github.com>
+        html_body: |
+          <h2>📡 IPTV文件自动同步完成</h2>
+          
+          <div style="background-color: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
+            <p><strong>🔄 同步状态：</strong> <span style="color: green;">✅ 成功更新</span></p>
+            <p><strong>📅 更新时间：</strong> $(date -u '+%Y-%m-%d %H:%M:%S UTC')</p>
+            <p><strong>🔗 源文件地址：</strong> <a href="https://github.com/ioptu/IPTV.txt2m3u.player">ioptu/IPTV.txt2m3u.player</a></p>
+            <p><strong>📂 你的文件：</strong> <a href="https://github.com/jia070310/lemonTV/blob/main/iptv-fe.m3u">jia070310/lemonTV/iptv-fe.m3u</a></p>
+          </div>
+          
+          <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
+            <h3>📊 文件信息</h3>
+            <p><strong>新文件哈希：</strong> <code>${{ steps.download.outputs.new_hash }}</code></p>
+            <p><strong>旧文件哈希：</strong> <code>${{ steps.hash_check.outputs.old_hash }}</code></p>
+            <p><strong>哈希变化：</strong> <span style="color: blue;">已检测到变化</span></p>
+          </div>
+          
+          <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;">
+            <p><small>此邮件由 GitHub Actions 自动发送</small></p>
+            <p><small>下次检查时间：$(date -u -d '+15 minutes' '+%Y-%m-%d %H:%M:%S UTC')</small></p>
+          </div>
+    
+    # 步骤7：记录无变化情况
+    - name: Log no changes
+      if: steps.compare.outputs.changed == 'false'
       run: |
-        echo "File was updated at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-        # 可在此处添加邮件、Slack、Discord等通知
-        # 例如使用curl调用webhook
-
-    - name: Log if no changes
-      if: steps.check.outputs.changed == 'false'
-      run: |
-        echo "⏭️ No changes detected at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        echo "⏭️ $(date -u '+%Y-%m-%d %H:%M:%S UTC') - 文件未变化，跳过更新"
+        echo "当前哈希: ${{ steps.hash_check.outputs.old_hash }}"

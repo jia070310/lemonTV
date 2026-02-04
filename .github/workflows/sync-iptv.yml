@@ -1,0 +1,96 @@
+name: Sync IPTV File
+
+on:
+  # 1. 定时触发（每30分钟检查一次）
+  schedule:
+    - cron: '*/30 * * * *'
+  # 2. 手动触发（在GitHub网页上手动运行）
+  workflow_dispatch:
+  # 3. 仓库推送时触发（可选）
+  push:
+    branches: [ main ]
+
+jobs:
+  sync-file:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout your repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.PAT_TOKEN }}
+        fetch-depth: 0
+
+    - name: Get current file hash (for comparison)
+      id: current_hash
+      run: |
+        if [ -f "iptv-fe.m3u" ]; then
+          CURRENT_HASH=$(sha256sum iptv-fe.m3u | awk '{print $1}')
+          echo "current_hash=$CURRENT_HASH" >> $GITHUB_OUTPUT
+          echo "Current file hash: $CURRENT_HASH"
+        else
+          echo "current_hash=none" >> $GITHUB_OUTPUT
+          echo "File does not exist yet"
+        fi
+
+    - name: Download latest source file
+      id: download
+      run: |
+        # 下载源文件
+        curl -s -L -o source.m3u "https://github.com/ioptu/IPTV.txt2m3u.player/raw/refs/heads/main/migu.m3u"
+        
+        # 计算新文件的哈希值
+        NEW_HASH=$(sha256sum source.m3u | awk '{print $1}')
+        echo "new_hash=$NEW_HASH" >> $GITHUB_OUTPUT
+        echo "New file hash: $NEW_HASH"
+        
+        # 获取文件大小和行数信息
+        FILESIZE=$(stat -f%z source.m3u 2>/dev/null || stat -c%s source.m3u)
+        LINES=$(wc -l < source.m3u)
+        echo "Downloaded file: ${FILESIZE} bytes, ${LINES} lines"
+
+    - name: Check if file has changed
+      id: check
+      run: |
+        if [ "${{ steps.current_hash.outputs.current_hash }}" == "${{ steps.download.outputs.new_hash }}" ]; then
+          echo "File has NOT changed. Skipping update."
+          echo "changed=false" >> $GITHUB_OUTPUT
+        else
+          echo "File HAS changed! Proceeding with update."
+          echo "changed=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Update file and push to repository
+      if: steps.check.outputs.changed == 'true'
+      run: |
+        # 更新文件
+        mv source.m3u iptv-fe.m3u
+        
+        # 配置Git
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        
+        # 提交更改
+        git add iptv-fe.m3u
+        git commit -m "Auto-sync IPTV: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        
+        Source: https://github.com/ioptu/IPTV.txt2m3u.player
+        Source Hash: ${{ steps.download.outputs.new_hash }}
+        Previous Hash: ${{ steps.current_hash.outputs.current_hash }}"
+        
+        # 推送更改
+        git push origin main
+        
+        echo "✅ Successfully updated iptv-fe.m3u"
+
+    - name: Send notification (optional)
+      if: steps.check.outputs.changed == 'true'
+      run: |
+        echo "File was updated at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        # 可在此处添加邮件、Slack、Discord等通知
+        # 例如使用curl调用webhook
+
+    - name: Log if no changes
+      if: steps.check.outputs.changed == 'false'
+      run: |
+        echo "⏭️ No changes detected at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"

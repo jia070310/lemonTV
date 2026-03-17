@@ -1,0 +1,8 @@
+# 确保 APK 文件以二进制模式处理
+*.apk binary
+*.jks binary
+
+# 防止行尾转换
+*.bat text eol=crlf
+*.sh text eol=lf
+*.md text eol=lf

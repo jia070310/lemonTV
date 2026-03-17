@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>柠檬TV - 设置中心</title>
+    <link href="./index_css.css" rel="stylesheet"/>
+    <script src="./index_js.js"></script>
+    <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --lemon-yellow: #fddd0e;
+            --bg-dark: #0a0a0a;
+            --bg-sidebar: #18181b;
+            --bg-main: #09090b;
+            --border-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
+            color: #f5f5f5;
+            overflow: hidden;
+        }
+        
+        .hide-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .hide-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .hide-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+        .hide-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        
+        /* 布局容器 */
+        .app-container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* 左侧导航栏 */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+        }
+        
+        .sidebar-header {
+            padding: 24px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: var(--lemon-yellow);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 4px 15px rgba(253, 221, 14, 0.25);
+        }
+        
+        .logo-text h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 2px;
+        }
+        
+        .logo-text p {
+            font-size: 11px;
+            color: #71717a;
+        }
+        
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            border-radius: 12px;
+            color: #a1a1aa;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            background: transparent;
+            width: 100%;
+            font-size: 15px;
+            font-weight: 500;
+        }
+        
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .nav-item.active {
+            background: var(--lemon-yellow);
+            color: #09090b;
+        }
+        
+        .nav-icon {
+            font-size: 22px;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .sidebar-footer {
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+        }
+        
+        .sidebar-footer p {
+            font-size: 12px;
+            color: #71717a;
+            font-style: italic;
+        }
+        
+        /* 主内容区 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: radial-gradient(circle at top right, rgba(253, 221, 14, 0.05), transparent 50%), var(--bg-main);
+            overflow: hidden;
+        }
+        
+        .main-header {
+            height: 64px;
+            padding: 0 32px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .header-tip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #a1a1aa;
+        }
+        
+        .header-link {
+            font-size: 13px;
+            color: #71717a;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.2s;
+        }
+        
+        .header-link:hover {
+            color: var(--lemon-yellow);
+        }
+        
+        .content-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 32px;
+        }
+        
+        .content-inner {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        /* 提示卡片 */
+        .alert-card {
+            background: rgba(253, 221, 14, 0.1);
+            border: 1px solid rgba(253, 221, 14, 0.2);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            gap: 16px;
+            margin-bottom: 32px;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        .alert-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(253, 221, 14, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 20px;
+        }
+        
+        .alert-content h3 {
+            color: var(--lemon-yellow);
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        
+        .alert-content p {
+            font-size: 13px;
+            color: rgba(253, 221, 14, 0.8);
+            line-height: 1.5;
+        }
+        
+        /* 设置区块 */
+        .section-container {
+            display: none;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        .section-container.active {
+            display: block;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+            margin-bottom: 24px;
+        }
+        
+        .section-title h2 {
+            font-size: 28px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 6px;
+        }
+        
+        .section-title p {
+            font-size: 14px;
+            color: #a1a1aa;
+        }
+        
+        .section-tag {
+            padding: 6px 12px;
+            background: #27272a;
+            color: #a1a1aa;
+            border-radius: 8px;
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
+            border: 1px solid var(--border-color);
+        }
+        
+        .settings-card {
+            background: rgba(39, 39, 42, 0.5);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+        
+        .input-group {
+            margin-bottom: 16px;
+        }
+        
+        .input-group:last-child {
+            margin-bottom: 0;
+        }
+        
+        .input-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #a1a1aa;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+            display: block;
+        }
+        
+        /* 输入框容器（支持清空按钮） */
+        .input-wrapper {
+            position: relative;
+        }
+        
+        .input-field,
+        .textarea-field {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 12px 16px;
+            color: white;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        
+        /* 带清空按钮的输入框 */
+        .input-field-with-clear {
+            padding-right: 44px;
+        }
+        
+        .textarea-field-with-clear {
+            padding-right: 44px;
+        }
+        
+        .clear-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #a1a1aa;
+            transition: all 0.2s;
+        }
+        
+        .clear-btn:hover {
+            background: rgba(253, 221, 14, 0.15);
+            border-color: rgba(253, 221, 14, 0.3);
+            color: var(--lemon-yellow);
+        }
+        
+        .textarea-clear-btn {
+            top: 12px;
+            transform: none;
+        }
+        
+        .textarea-field {
+            min-height: 80px;
+            resize: vertical;
+            font-family: 'Courier New', monospace;
+            line-height: 1.5;
+        }
+        
+        .input-field:focus,
+        .textarea-field:focus {
+            border-color: rgba(253, 221, 14, 0.5);
+            box-shadow: 0 0 0 3px rgba(253, 221, 14, 0.1);
+        }
+        
+        .input-field::placeholder,
+        .textarea-field::placeholder {
+            color: #52525b;
+        }
+        
+        .btn-primary {
+            width: 100%;
+            padding: 16px 24px;
+            background: var(--lemon-yellow);
+            color: #09090b;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+            margin-top: 16px;
+        }
+        
+        .btn-primary:hover {
+            background: #f5d40e;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(253, 221, 14, 0.3);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        /* 日志样式 */
+        .log-container {
+            background: #09090b;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .log-item {
+            padding: 16px;
+            background: rgba(39, 39, 42, 0.5);
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .log-badges {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .log-badge {
+            padding: 4px 10px;
+            background: rgba(253, 221, 14, 0.1);
+            color: var(--lemon-yellow);
+            border: 1px solid rgba(253, 221, 14, 0.2);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .log-time {
+            font-size: 12px;
+            color: #71717a;
+        }
+        
+        .log-message {
+            font-size: 14px;
+            color: white;
+            line-height: 1.5;
+        }
+        
+        .log-cause {
+            font-size: 12px;
+            color: #a1a1aa;
+            margin-top: 6px;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                height: 100vh;
+                z-index: 100;
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                width: 100%;
+            }
+            
+            .content-scroll {
+                padding: 20px 16px;
+            }
+            
+            .main-header {
+                padding: 0 16px;
+            }
+            
+            .section-header {
+                flex-direction: column;
+                align-items: start;
+                gap: 12px;
+            }
+        }
+        
+        /* 移动端菜单按钮 */
+        .mobile-menu-btn {
+            display: none;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .mobile-menu-btn {
+                display: flex;
+            }
+        }
+        
+        /* Overlay */
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 99;
+        }
+        
+        .overlay.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <van-config-provider theme="dark">
+            <template v-if="settings">
+                <div class="app-container">
+                    <!-- 遮罩层（移动端） -->
+                    <div class="overlay" :class="{ active: sidebarOpen }" @click="sidebarOpen = false"></div>
+                    
+                    <!-- 左侧导航栏 -->
+                    <aside class="sidebar hide-scrollbar" :class="{ open: sidebarOpen }">
+                        <div class="sidebar-header">
+                            <div class="logo-area">
+                                <div class="logo-icon">
+                                    <span class="iconify" data-icon="material-symbols:tv-rounded" style="color: #09090b;"></span>
+                                </div>
+                                <div class="logo-text">
+                                    <h1>{{ settings.appTitle }}</h1>
+                                    <p>{{ settings.appRepo }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <nav class="sidebar-nav hide-scrollbar">
+                            <button 
+                                class="nav-item" 
+                                :class="{ active: activeSection === 'source' }"
+                                @click="switchSection('source')"
+                            >
+                                <span class="iconify nav-icon" data-icon="material-symbols:settings-input-antenna"></span>
+                                <span>自定义直播源</span>
+                            </button>
+                            
+                            <button 
+                                class="nav-item" 
+                                :class="{ active: activeSection === 'epg' }"
+                                @click="switchSection('epg')"
+                            >
+                                <span class="iconify nav-icon" data-icon="material-symbols:calendar-month-outline"></span>
+                                <span>自定义节目单</span>
+                            </button>
+                            
+                            <button 
+                                class="nav-item" 
+                                :class="{ active: activeSection === 'player' }"
+                                @click="switchSection('player')"
+                            >
+                                <span class="iconify nav-icon" data-icon="material-symbols:play-circle-outline"></span>
+                                <span>播放器设置</span>
+                            </button>
+                            
+                            <button 
+                                class="nav-item" 
+                                :class="{ active: activeSection === 'debug' }"
+                                @click="switchSection('debug')"
+                            >
+                                <span class="iconify nav-icon" data-icon="material-symbols:bug-report-outline"></span>
+                                <span>调试功能</span>
+                            </button>
+                            
+                            <button 
+                                class="nav-item" 
+                                :class="{ active: activeSection === 'log' }"
+                                @click="switchSection('log')"
+                            >
+                                <span class="iconify nav-icon" data-icon="material-symbols:list-alt-outline"></span>
+                                <span>运行日志</span>
+                            </button>
+                        </nav>
+                        
+                        <div class="sidebar-footer">
+                            <p style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                <span class="iconify" data-icon="material-symbols:database-outline" style="font-size: 14px;"></span>
+                                <span>系统配置就绪</span>
+                            </p>
+                        </div>
+                    </aside>
+                    
+                    <!-- 右侧主内容区 -->
+                    <main class="main-content">
+                        <header class="main-header">
+                            <div style="display: flex; align-items: center; gap: 16px;">
+                                <button class="mobile-menu-btn" @click="sidebarOpen = !sidebarOpen">
+                                    <span class="iconify" data-icon="material-symbols:menu-rounded"></span>
+                                </button>
+                                <div class="header-tip">
+                                    <span class="iconify" data-icon="material-symbols:info-outline" style="color: var(--lemon-yellow);"></span>
+                                    <span>修改后需重启应用才能生效</span>
+                                </div>
+                            </div>
+                            <a class="header-link" href="https://github.com/jia070310/lemonTV" target="_blank">
+                                <span class="iconify" data-icon="mdi:github"></span>
+                                <span>GitHub 项目</span>
+                            </a>
+                        </header>
+                        
+                        <div class="content-scroll hide-scrollbar">
+                            <div class="content-inner">
+                                <!-- 重要提示 -->
+                                <div class="alert-card">
+                                    <div class="alert-icon">
+                                        <span class="iconify" data-icon="material-symbols:warning-rounded" style="color: var(--lemon-yellow); font-size: 24px;"></span>
+                                    </div>
+                                    <div class="alert-content">
+                                        <h3>重要提示</h3>
+                                        <p>修改之前请先关闭应用设置界面，否则会有冲突。所有更改将在下次启动时应用。</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- 自定义直播源 -->
+                                <section class="section-container" :class="{ active: activeSection === 'source' }">
+                                    <div class="section-header">
+                                        <div class="section-title">
+                                            <h2>自定义直播源</h2>
+                                            <p>支持 m3u 链接与 tvbox 链接，提供高清流媒体体验</p>
+                                        </div>
+                                        <span class="section-tag">TYPE: M3U/TVBOX</span>
+                                    </div>
+                                    
+                                    <div class="settings-card">
+                                        <div class="input-group">
+                                            <label class="input-label">源名称</label>
+                                            <div class="input-wrapper">
+                                                <input 
+                                                    v-model="customSourceName" 
+                                                    type="text" 
+                                                    class="input-field input-field-with-clear"
+                                                    placeholder="例如：IPTV高清源"
+                                                />
+                                                <button 
+                                                    v-if="customSourceName" 
+                                                    class="clear-btn" 
+                                                    @click="customSourceName = ''"
+                                                >
+                                                    <span class="iconify" data-icon="material-symbols:close-rounded" style="font-size: 18px;"></span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="input-group">
+                                            <label class="input-label">源地址 (URL)</label>
+                                            <div class="input-wrapper">
+                                                <textarea 
+                                                    v-model="customSourceUrl" 
+                                                    class="textarea-field textarea-field-with-clear"
+                                                    rows="3"
+                                                    placeholder="直播源地址（置为空时将恢复默认）"
+                                                ></textarea>
+                                                <button 
+                                                    v-if="customSourceUrl" 
+                                                    class="clear-btn textarea-clear-btn" 
+                                                    @click="customSourceUrl = ''"
+                                                >
+                                                    <span class="iconify" data-icon="material-symbols:close-rounded" style="font-size: 18px;"></span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <button 
+                                            class="btn-primary" 
+                                            @click="pushCustomSource()"
+                                        >
+                                            <span class="iconify" data-icon="material-symbols:send-rounded"></span>
+                                            <span>推送链接至应用</span>
+                                        </button>
+                                    </div>
+                                </section>
+                                
+                                <!-- 自定义节目单 -->
+                                <section class="section-container" :class="{ active: activeSection === 'epg' }">
+                                    <div class="section-header">
+                                        <div class="section-title">
+                                            <h2>自定义节目单</h2>
+                                            <p>支持 xml、xml.gz 格式，实时查看节目预告</p>
+                                        </div>
+                                        <span class="section-tag">TYPE: XML</span>
+                                    </div>
+                                    
+                                    <div class="settings-card">
+                                        <div class="input-group">
+                                            <label class="input-label">节目单标识</label>
+                                            <input 
+                                                v-model="settings.epgXmlUrlName" 
+                                                type="text" 
+                                                class="input-field"
+                                                placeholder="例如：官方EPG"
+                                            />
+                                        </div>
+                                        
+                                        <div class="input-group">
+                                            <label class="input-label">XML 链接地址</label>
+                                            <input 
+                                                v-model="settings.epgXmlUrl" 
+                                                type="text" 
+                                                class="input-field"
+                                                placeholder="节目单地址（置为空时将恢复默认）"
+                                            />
+                                        </div>
+                                        
+                                        <button 
+                                            class="btn-primary" 
+                                            @click="settings.epgXmlCachedAt = 0; settings.epgCachedHash = 0; confirmSettings()"
+                                        >
+                                            <span class="iconify" data-icon="material-symbols:cloud-upload-rounded"></span>
+                                            <span>同步节目单数据</span>
+                                        </button>
+                                    </div>
+                                </section>
+                                
+                                <!-- 播放器设置 -->
+                                <section class="section-container" :class="{ active: activeSection === 'player' }">
+                                    <div class="section-header">
+                                        <div class="section-title">
+                                            <h2>播放器设置</h2>
+                                            <p>自定义 User-Agent 以适配特殊的直播服务器验证请求</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="settings-card">
+                                        <div class="input-group">
+                                            <label class="input-label">User-Agent</label>
+                                            <input 
+                                                v-model="settings.videoPlayerUserAgent" 
+                                                type="text" 
+                                                class="input-field"
+                                                placeholder="User-Agent（置为空时将恢复默认）"
+                                            />
+                                        </div>
+                                        
+                                        <button 
+                                            class="btn-primary" 
+                                            @click="confirmSettings()"
+                                        >
+                                            <span class="iconify" data-icon="material-symbols:save-rounded"></span>
+                                            <span>保存播放器配置</span>
+                                        </button>
+                                    </div>
+                                </section>
+                                
+                                <!-- 调试功能 -->
+                                <section class="section-container" :class="{ active: activeSection === 'debug' }">
+                                    <div class="section-header">
+                                        <div class="section-title">
+                                            <h2>调试功能</h2>
+                                            <p>将本地应用文件直接推送到电视端进行更新或测试</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="settings-card">
+                                        <van-uploader 
+                                            :after-read="uploaderAfterRead" 
+                                            accept=".apk"
+                                            style="width: 100%;"
+                                        >
+                                            <button class="btn-primary">
+                                                <span class="iconify" data-icon="material-symbols:upload-file-rounded"></span>
+                                                <span>选择 APK 文件</span>
+                                            </button>
+                                        </van-uploader>
+                                    </div>
+                                </section>
+                                
+                                <!-- 运行日志 -->
+                                <section class="section-container" :class="{ active: activeSection === 'log' }">
+                                    <div class="section-header">
+                                        <div class="section-title">
+                                            <h2>运行日志</h2>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="log-container hide-scrollbar">
+                                        <div v-for="item in settings.logHistory" :key="item.time" class="log-item">
+                                            <div class="log-header">
+                                                <div class="log-badges">
+                                                    <span class="log-badge">{{ item.tag }}</span>
+                                                    <span class="log-badge">{{ item.level }}</span>
+                                                </div>
+                                                <span class="log-time">{{ dayjs(item.time).format('HH:mm:ss') }}</span>
+                                            </div>
+                                            <div class="log-message">{{ item.message }}</div>
+                                            <div v-if="item.cause" class="log-cause">{{ item.cause }}</div>
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            </template>
+            
+            <van-empty image="network" v-else />
+        </van-config-provider>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue
+        const baseUrl = ""
+
+        async function requestApi(url, config) {
+            const resp = await fetch(`${baseUrl}${url}`, config)
+            if (resp.status !== 200) {
+                throw new Error(`请求失败：${resp.status}`)
+            }
+            return resp
+        }
+
+        dayjs.locale('zh-cn')
+        dayjs.extend(dayjs_plugin_relativeTime)
+
+        createApp({
+            setup() {
+                const activeSection = ref('source')
+                const sidebarOpen = ref(false)
+                const settings = ref()
+                
+                // 自定义源输入框（默认为空）
+                const customSourceName = ref('')
+                const customSourceUrl = ref('')
+                
+                function switchSection(section) {
+                    activeSection.value = section
+                    sidebarOpen.value = false
+                }
+                
+                // 推送自定义源
+                async function pushCustomSource() {
+                    try {
+                        vant.showLoadingToast({ message: '加载中...', forbidClick: true, duration: 0 })
+                        
+                        // 将自定义数据写入 settings
+                        settings.value.iptvSourceName = customSourceName.value
+                        settings.value.iptvSourceUrl = customSourceUrl.value
+                        settings.value.iptvSourceCachedAt = 0
+                        
+                        await requestApi('/api/settings', {
+                            method: "POST",
+                            body: JSON.stringify({ ...settings.value, logHistory: undefined }),
+                            headers: { 'Content-Type': 'application/json' }
+                        })
+                        await refreshSettings()
+                        vant.closeToast()
+                        vant.showSuccessToast('设置已保存')
+                    } catch (e) {
+                        vant.showFailToast('无法修改设置')
+                        console.error(e)
+                        refreshSettings()
+                    }
+                }
+
+                async function confirmSettings() {
+                    try {
+                        vant.showLoadingToast({ message: '加载中...', forbidClick: true, duration: 0 })
+                        await requestApi('/api/settings', {
+                            method: "POST",
+                            body: JSON.stringify({ ...settings.value, logHistory: undefined }),
+                            headers: { 'Content-Type': 'application/json' }
+                        })
+                        await refreshSettings()
+                        vant.closeToast()
+                        vant.showSuccessToast('设置已保存')
+                    } catch (e) {
+                        vant.showFailToast('无法修改设置')
+                        console.error(e)
+                        refreshSettings()
+                    }
+                }
+                
+                async function refreshSettings() {
+                    try {
+                        vant.showLoadingToast({ message: '加载中...', forbidClick: true, duration: 0 })
+                        settings.value = await (await requestApi('/api/settings')).json()
+                        settings.value.logHistory = settings.value.logHistory.reverse()
+                        vant.closeToast()
+                    } catch (e) {
+                        vant.showFailToast('无法获取设置')
+                        console.error(e)
+                    }
+                }
+
+                async function uploaderAfterRead(file) {
+                    try {
+                        vant.showLoadingToast({ message: '上传中...', forbidClick: true, duration: 0 })
+                        const formData = new FormData()
+                        formData.append('filename', file.file)
+                        await requestApi('/api/upload/apk', { method: "POST", body: formData })
+                        vant.showSuccessToast('上传成功')
+                    } catch (e) {
+                        vant.showFailToast('上传apk失败')
+                        console.error(e)
+                    }
+                }
+
+                onMounted(async () => {
+                    await refreshSettings()
+                })
+
+                return {
+                    dayjs,
+                    activeSection,
+                    sidebarOpen,
+                    settings,
+                    customSourceName,
+                    customSourceUrl,
+                    switchSection,
+                    pushCustomSource,
+                    confirmSettings,
+                    uploaderAfterRead,
+                }
+            }
+        })
+            .use(vant)
+            .mount('#app')
+    </script>
+</body>
+</html>

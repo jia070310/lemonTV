@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MyIPTV" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- 启动画面配置 -->
+        <item name="android:windowBackground">@drawable/splash_background</item>
+    </style>
+    <style name="Theme.MyIPTV.Leanback" parent="android:Theme.Black.NoTitleBar.Fullscreen">
+        <!-- 启动画面配置 -->
+        <item name="android:windowBackground">@drawable/splash_background</item>
+    </style>
+</resources>

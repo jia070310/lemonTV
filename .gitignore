@@ -1,0 +1,30 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+/.idea/deploymentTargetDropDown.xml
+/.idea/git_toolbox_prj.xml
+/.idea/deploymentTargetSelector.xml
+/.idea/GrepConsole.xml
+/.idea/material_theme_project_new.xml
+/.idea/other.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+key.properties
+
+# 签名文件（敏感）
+*.jks
+*.keystore
+
+# Release 准备文件（本地构建产物）
+/release/
+RELEASE_NOTES_*.md

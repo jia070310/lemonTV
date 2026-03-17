@@ -1,0 +1,22 @@
+{
+  "appTitle": "我的电视 (预览模式)",
+  "appRepo": "https://github.com/yogiczy/mytv-android",
+  "iptvSourceUrl": "http://example.com/live.m3u",
+  "epgXmlUrl": "http://example.com/epg.xml",
+  "videoPlayerUserAgent": "Mozilla/5.0...",
+  "appBootLaunch": true,
+  "appDeviceDisplayType": 0,
+  "debugShowFps": false,
+  "iptvChannelChangeFlip": false,
+  "iptvSourceSimplify": true,
+  "iptvChannelNoSelectEnable": true,
+  "epgEnable": true,
+  "uiShowEpgProgrammeProgress": true,
+  "uiUseClassicPanelScreen": false,
+  "logHistory": [
+    { "time": 1706500000000, "level": "INFO", "tag": "System", "message": "应用启动成功" },
+    { "time": 1706500005000, "level": "DEBUG", "tag": "HTTP", "message": "正在加载直播源数据..." },
+    { "time": 1706500010000, "level": "WARN", "tag": "Player", "message": "部分频道加载缓慢" },
+    { "time": 1706500015000, "level": "ERROR", "tag": "Network", "message": "无法连接到节目单服务器", "cause": "java.net.UnknownHostException: example.com" }
+  ]
+}

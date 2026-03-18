@@ -1,0 +1,5 @@
+密钥库文件：lemontv-release.jks
+密钥库密码：lemontv2024
+密钥别名：lemontv-key
+密钥密码：lemontv2024
+有效期：2026-2053（27年）

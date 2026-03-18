@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>柠檬TV v1.0.1 - 发布指南</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #FDDD0E 0%, #FFA500 100%);
+            color: #000;
+            padding: 40px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.3);
+        }
+
+        header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .step {
+            background: #f8f9fa;
+            border-left: 5px solid #FDDD0E;
+            padding: 25px;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .step:hover {
+            transform: translateX(10px);
+            box-shadow: 0 10px 30px rgba(253, 221, 14, 0.2);
+        }
+
+        .step-number {
+            display: inline-block;
+            background: #FDDD0E;
+            color: #000;
+            width: 40px;
+            height: 40px;
+            line-height: 40px;
+            text-align: center;
+            border-radius: 50%;
+            font-weight: bold;
+            margin-right: 15px;
+            font-size: 1.2em;
+        }
+
+        .step h2 {
+            display: inline-block;
+            font-size: 1.5em;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .step-content {
+            margin-top: 20px;
+            padding-left: 55px;
+        }
+
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            position: relative;
+        }
+
+        .code-block pre {
+            margin: 0;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #FDDD0E;
+            color: #000;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .copy-btn:hover {
+            background: #FFA500;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        .success-box {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        .file-list {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .file-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 3px solid #FDDD0E;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-item:hover {
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin: 0 5px;
+        }
+
+        .badge-primary {
+            background: #FDDD0E;
+            color: #000;
+        }
+
+        .badge-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .badge-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #FDDD0E;
+            color: #000;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+        }
+
+        .btn:hover {
+            background: #FFA500;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(253, 221, 14, 0.3);
+        }
+
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+
+        .checklist li {
+            padding: 12px;
+            margin: 8px 0;
+            background: white;
+            border-radius: 5px;
+            border-left: 3px solid #28a745;
+            transition: all 0.3s ease;
+        }
+
+        .checklist li:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .checklist li::before {
+            content: "✓ ";
+            color: #28a745;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-right: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th {
+            background: #FDDD0E;
+            color: #000;
+            padding: 15px;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .progress-bar {
+            background: #e0e0e0;
+            height: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #FDDD0E 0%, #FFA500 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #000;
+            font-weight: bold;
+        }
+
+        footer {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 30px;
+        }
+
+        footer a {
+            color: #FDDD0E;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+            }
+
+            header h1 {
+                font-size: 2em;
+            }
+
+            .content {
+                padding: 20px;
+            }
+        }
+
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .accordion-content.active {
+            max-height: 2000px;
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🍋 柠檬TV v1.0.1</h1>
+            <p>GitHub Release 发布完整指南</p>
+        </header>
+
+        <div class="content">
+            <!-- 概览 -->
+            <div class="success-box">
+                <h3>📋 发布信息概览</h3>
+                <table>
+                    <tr>
+                        <th>项目</th>
+                        <th>内容</th>
+                    </tr>
+                    <tr>
+                        <td><strong>应用名称</strong></td>
+                        <td>柠檬TV</td>
+                    </tr>
+                    <tr>
+                        <td><strong>版本号</strong></td>
+                        <td>1.0.1</td>
+                    </tr>
+                    <tr>
+                        <td><strong>包名</strong></td>
+                        <td>com.lemontv.lite</td>
+                    </tr>
+                    <tr>
+                        <td><strong>GitHub 仓库</strong></td>
+                        <td><a href="https://github.com/jia070310/lemonTV" target="_blank">https://github.com/jia070310/lemonTV</a></td>
+                    </tr>
+                    <tr>
+                        <td><strong>最低 Android 版本</strong></td>
+                        <td>5.0 (API 21)</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- 步骤 1 -->
+            <div class="step" onclick="toggleAccordion(this)">
+                <span class="step-number">1</span>
+                <h2>构建 Release APK</h2>
+                <div class="step-content accordion-content">
+                    <p>运行构建脚本生成正式签名的 APK 文件。</p>
+                    
+                    <div class="info-box">
+                        <strong>📝 推荐方式：</strong> 使用标准构建脚本（已优化，避免文件占用问题）
+                    </div>
+
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyCode(this, event)">复制</button>
+                        <pre>双击运行: build-release.bat</pre>
+                    </div>
+
+                    <div class="warning-box">
+                        <strong>⚠️ 如果遇到文件占用问题：</strong>
+                        <ul style="margin-top: 10px;">
+                            <li>关闭所有文件资源管理器窗口</li>
+                            <li>关闭 Android Studio（如果打开）</li>
+                            <li>使用增强版构建脚本（自动清理）</li>
+                        </ul>
+                    </div>
+
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyCode(this, event)">复制</button>
+                        <pre>双击运行: build-release-enhanced.bat  (增强版，自动清理)</pre>
+                    </div>
+
+                    <div class="success-box">
+                        <strong>✓ 构建成功标志：</strong>
+                        <br>看到 "BUILD SUCCESSFUL" 并生成文件：
+                        <code style="background: #e0e0e0; padding: 3px 8px; border-radius: 3px;">
+                            app\build\outputs\apk\release\app-release.apk
+                        </code>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 步骤 2 -->
+            <div class="step" onclick="toggleAccordion(this)">
+                <span class="step-number">2</span>
+                <h2>准备发布文件（重命名）</h2>
+                <div class="step-content accordion-content">
+                    <p>将构建产物重命名为规范的发布文件名。</p>
+
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyCode(this, event)">复制</button>
+                        <pre>双击运行: rename-and-prepare-release.bat</pre>
+                    </div>
+
+                    <div class="info-box">
+                        <strong>📦 生成的文件：</strong>
+                        <br>位置：<code style="background: #e0e0e0; padding: 3px 8px; border-radius: 3px;">release\LemonTV-v1.0.1-release.apk</code>
+                    </div>
+
+                    <h3 style="margin-top: 20px;">文件命名规范</h3>
+                    <table>
+                        <tr>
+                            <th>格式</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td><code>LemonTV-v1.0.1-release.apk</code></td>
+                            <td>✅ 推荐：通用版（包含所有架构）</td>
+                        </tr>
+                        <tr>
+                            <td><code>LemonTV-v1.0.1-arm64-v8a.apk</code></td>
+                            <td>ARM64 架构专用版</td>
+                        </tr>
+                        <tr>
+                            <td><code>柠檬TV 1.0.1.apk</code></td>
+                            <td>❌ 错误：包含中文和空格</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 步骤 3 -->
+            <div class="step" onclick="toggleAccordion(this)">
+                <span class="step-number">3</span>
+                <h2>访问 GitHub Release 页面</h2>
+                <div class="step-content accordion-content">
+                    <p>前往 GitHub 仓库创建新的 Release。</p>
+
+                    <div style="text-align: center; margin: 20px 0;">
+                        <a href="https://github.com/jia070310/lemonTV/releases/new" target="_blank" class="btn">
+                            🚀 立即创建 Release
+                        </a>
+                    </div>
+
+                    <div class="info-box">
+                        <strong>📍 手动访问步骤：</strong>
+                        <ol style="margin-top: 10px; padding-left: 20px;">
+                            <li>打开 <a href="https://github.com/jia070310/lemonTV" target="_blank">https://github.com/jia070310/lemonTV</a></li>
+                            <li>点击右侧菜单中的 <strong>"Releases"</strong></li>
+                            <li>点击 <strong>"Draft a new release"</strong> 按钮</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 步骤 4 -->
+            <div class="step" onclick="toggleAccordion(this)">
+                <span class="step-number">4</span>
+                <h2>填写 Release 信息</h2>
+                <div class="step-content accordion-content">
+                    <h3>📝 表单填写内容</h3>
+
+                    <div class="file-list">
+                        <div class="file-item">
+                            <div>
+                                <strong>Tag version（标签版本）</strong>
+                                <div class="code-block" style="margin-top: 10px;">
+                                    <button class="copy-btn" onclick="copyCode(this, event)">复制</button>
+                                    <pre>v1.0.1</pre>
+                                </div>
+                            </div>
+                            <span class="badge badge-danger">必填</span>
+                        </div>
+
+                        <div class="file-item">
+                            <div>
+                                <strong>Target（目标分支）</strong>
+                                <div class="code-block" style="margin-top: 10px;">
+                                    <button class="copy-btn" onclick="copyCode(this, event)">复制</button>
+                                    <pre>main</pre>
+                                </div>
+                            </div>
+                            <span class="badge badge-primary">默认值</span>
+                        </div>
+
+                        <div class="file-item">
+                            <div style="width: 100%;">
+                                <strong>Release title（发布标题）</strong>
+                                <div class="code-block" style="margin-top: 10px;">
+                                    <button class="copy-btn" onclick="copyCode(this, event)">复制</button>
+                                    <pre>柠檬TV v1.0.1 - 轻量级智能电视直播应用</pre>
+                                </div>
+                            </div>
+                            <span class="badge badge-danger">必填</span>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-top: 30px;">📄 Description（发布说明）</h3>
+                    <div class="info-box">
+                        <strong>💡 提示：</strong> 复制下方完整的发布说明内容
+                    </div>
+
+                    <div class="code-block" style="max-height: 400px; overflow-y: auto;">
+                        <button class="copy-btn" onclick="copyCode(this, event)">复制全部</button>
+                        <pre># 柠檬TV v1.0.1
+
+> 🍋 轻量级智能电视直播应用
+
+## 📦 下载说明
+
+### APK 文件
+- **LemonTV-v1.0.1-release.apk** - 推荐下载（通用版，支持所有设备）
+  - 包名：`com.lemontv.lite`
+  - 版本号：1.0.1
+  - 最低 Android 版本：5.0 (API 21)
+  - 支持架构：armeabi-v7a, arm64-v8a, x86_64
+
+### 安装方式
+1. 下载 APK 文件到电视或盒子
+2. 使用文件管理器打开
+3. 允许安装未知来源应用
+4. 点击安装
+
+## ✨ 本版本特性
+
+### 🎯 核心功能
+- ✅ 智能直播源管理，支持自定义 M3U/TXT 格式
+- ✅ 节目单（EPG）多级智能降级加载
+  - 优先使用直播源内嵌 EPG 地址（支持逗号分隔多个地址）
+  - 失败后降级到 APP 设置的 EPG
+  - 最后使用默认 EPG
+- ✅ User-Agent 智能识别（从直播源自动提取）
+- ✅ 一键刷新直播源，更新缓存
+- ✅ 多线路切换，播放失败自动切换
+- ✅ 经典选台模式（数字键快速选台）
+- ✅ 支持局域网推送直播源（10481 端口）
+
+### 🎨 界面优化
+- ✅ 全新主题黄色（#FDDD0E）Toast 提示框
+- ✅ 优化启动画面，品牌统一
+- ✅ 菜单键快速呼出设置和操作面板
+- ✅ 选中高亮效果统一
+
+### 🔧 技术改进
+- ✅ 缓存机制优化，自动创建缓存目录
+- ✅ 支持 M3U 多 EPG 地址解析（逗号分隔）
+- ✅ GitHub 加速代理更新为 `https://hk.gh-proxy.org/`
+- ✅ 网络请求重试机制（最多 10 次）
+- ✅ 文件缓存容错和重试机制
+
+## 🐛 已修复问题
+- ✅ 修复缓存目录不存在导致的播放失败（403 错误）
+- ✅ 修复 EPG 地址只读取第一个的问题
+- ✅ 修复直播源热更新后新增频道不显示
+
+## 📱 使用说明
+
+### 快捷键
+- **菜单键** - 打开快速面板（刷新源、画面比例、设置等）
+- **数字键** - 经典选台模式
+- **上下键** - 切换频道
+- **左右键** - 切换线路（多线路时）
+- **返回键** - 退出/返回上级
+
+### 推送直播源
+1. 确保电视和手机在同一局域网
+2. 打开设置界面查看推送地址（例如：`http://192.168.1.100:10481`）
+3. 在浏览器中打开该地址
+4. 输入直播源地址并推送
+
+### 刷新源
+1. 按遥控器**菜单键**打开快速面板
+2. 选择"**刷新源**"按钮
+3. 系统会清除缓存并重新加载最新直播源
+
+## ⚙️ 配置说明
+
+### 默认配置
+- **包名**：com.lemontv.lite
+- **应用名称**：柠檬TV
+- **默认直播源**：https://gh-proxy.org/https://raw.githubusercontent.com/jia070310/lemonTV/refs/heads/main/iptv-fe.m3u
+- **默认 EPG**：http://epg.51zmt.top:8000/e.xml.gz
+- **HTTP 服务端口**：10481
+
+## 🔄 更新说明
+本 APP 支持在线检查更新，检测到新版本会自动提示下载。
+
+更新源：https://api.github.com/repos/jia070310/lemonTV/releases/latest
+
+## 📋 系统要求
+- Android 5.0 或更高版本
+- 推荐设备：智能电视、电视盒子、平板
+- 网络要求：稳定的互联网连接
+
+## 🤝 反馈与支持
+- GitHub Issues：https://github.com/jia070310/lemonTV/issues
+- 讨论区：https://github.com/jia070310/lemonTV/discussions
+
+---
+
+**注意事项**：
+1. 首次安装需要允许"安装未知来源应用"权限
+2. 部分直播源可能因版权或地区限制无法播放
+3. 建议使用稳定的网络环境以获得最佳体验
+4. 如遇播放问题，可尝试"刷新源"或切换线路
+
+---
+
+## 🎉 感谢使用柠檬TV！
+
+如果觉得好用，请给我们一个 ⭐ Star！</pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 步骤 5 -->
+            <div class="step" onclick="toggleAccordion(this)">
+                <span class="step-number">5</span>
+                <h2>上传 APK 文件</h2>
+                <div class="step-content accordion-content">
+                    <p>将准备好的 APK 文件附加到 Release。</p>
+
+                    <div class="info-box">
+                        <strong>📤 上传方式（二选一）：</strong>
+                        <ol style="margin-top: 10px; padding-left: 20px;">
+                            <li><strong>拖拽上传</strong>：直接将 <code>release\LemonTV-v1.0.1-release.apk</code> 拖到 "Attach binaries" 区域</li>
+                            <li><strong>点击上传</strong>：点击 "Attach files by dropping here or selecting them." 选择文件</li>
+                        </ol>
+                    </div>
+
+                    <div class="warning-box">
+                        <strong>⚠️ 重要提示：</strong>
+                        <ul style="margin-top: 10px;">
+                            <li>确保文件名为：<code>LemonTV-v1.0.1-release.apk</code></li>
+                            <li>文件大小约 15-30 MB（根据功能不同）</li>
+                            <li>GitHub 会自动计算文件的 SHA256 校验和</li>
+                            <li><strong>不要上传</strong> <code>.jks</code> 签名文件！</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 步骤 6 -->
+            <div class="step" onclick="toggleAccordion(this)">
+                <span class="step-number">6</span>
+                <h2>发布设置</h2>
+                <div class="step-content accordion-content">
+                    <h3>✓ 发布选项配置</h3>
+
+                    <ul class="checklist">
+                        <li>勾选 <strong>"Set as the latest release"</strong>（设为最新版本）</li>
+                        <li>如果是正式版，<strong>不要勾选</strong> "Set as a pre-release"</li>
+                        <li>如果是测试版/预览版，勾选 "Set as a pre-release"</li>
+                    </ul>
+
+                    <div class="info-box" style="margin-top: 20px;">
+                        <strong>💡 版本类型说明：</strong>
+                        <table style="margin-top: 10px;">
+                            <tr>
+                                <th>类型</th>
+                                <th>说明</th>
+                                <th>勾选 Pre-release</th>
+                            </tr>
+                            <tr>
+                                <td><strong>正式版</strong></td>
+                                <td>稳定版本，推荐用户下载</td>
+                                <td>❌ 不勾选</td>
+                            </tr>
+                            <tr>
+                                <td><strong>测试版</strong></td>
+                                <td>Beta 版本，可能有 bug</td>
+                                <td>✅ 勾选</td>
+                            </tr>
+                            <tr>
+                                <td><strong>预览版</strong></td>
+                                <td>开发中版本，仅供测试</td>
+                                <td>✅ 勾选</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 步骤 7 -->
+            <div class="step" onclick="toggleAccordion(this)">
+                <span class="step-number">7</span>
+                <h2>发布 Release</h2>
+                <div class="step-content accordion-content">
+                    <p>完成所有配置后，点击发布按钮。</p>
+
+                    <div style="text-align: center; margin: 30px 0;">
+                        <button class="btn" style="font-size: 1.2em; padding: 15px 40px;">
+                            🎉 Publish release
+                        </button>
+                    </div>
+
+                    <div class="success-box">
+                        <strong>✓ 发布成功标志：</strong>
+                        <ul style="margin-top: 10px; padding-left: 20px;">
+                            <li>页面跳转到 Release 详情页</li>
+                            <li>可以看到版本标签 <code>v1.0.1</code></li>
+                            <li>APK 文件可以下载</li>
+                            <li>APP 自动更新功能会检测到新版本</li>
+                        </ul>
+                    </div>
+
+                    <div class="info-box" style="margin-top: 20px;">
+                        <strong>🔗 发布后的 URL：</strong>
+                        <br>
+                        <code>https://github.com/jia070310/lemonTV/releases/tag/v1.0.1</code>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 验证与测试 -->
+            <div class="step" onclick="toggleAccordion(this)">
+                <span class="step-number">8</span>
+                <h2>验证发布</h2>
+                <div class="step-content accordion-content">
+                    <h3>🔍 发布后检查清单</h3>
+
+                    <ul class="checklist">
+                        <li>访问 Releases 页面，确认版本显示正确</li>
+                        <li>点击下载 APK，检查文件名和大小</li>
+                        <li>测试 APP 内自动更新功能</li>
+                        <li>验证 Release 说明格式正确，无乱码</li>
+                    </ul>
+
+                    <h3 style="margin-top: 30px;">🧪 测试自动更新</h3>
+                    <div class="info-box">
+                        <ol style="padding-left: 20px;">
+                            <li>打开旧版本的 APP（如果版本号低于 1.0.1）</li>
+                            <li>等待几秒，APP 会自动检测更新</li>
+                            <li>看到更新提示弹窗</li>
+                            <li>点击下载，验证能否正常下载和安装</li>
+                        </ol>
+                    </div>
+
+                    <div class="warning-box" style="margin-top: 20px;">
+                        <strong>⚠️ 如果更新检测不到：</strong>
+                        <ul style="margin-top: 10px;">
+                            <li>检查 GitHub API 地址是否正确：<code>https://api.github.com/repos/jia070310/lemonTV/releases/latest</code></li>
+                            <li>确认 Release 已设为 "latest"</li>
+                            <li>清除 APP 缓存后重试</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 工具文件说明 -->
+            <div class="step" onclick="toggleAccordion(this)">
+                <span class="step-number">📁</span>
+                <h2>辅助工具文件说明</h2>
+                <div class="step-content accordion-content">
+                    <h3>🛠️ 项目中的脚本文件</h3>
+
+                    <div class="file-list">
+                        <div class="file-item">
+                            <div>
+                                <strong>build-release.bat</strong>
+                                <p style="color: #666; font-size: 0.9em; margin-top: 5px;">标准 Release 构建脚本</p>
+                            </div>
+                            <span class="badge badge-success">推荐</span>
+                        </div>
+
+                        <div class="file-item">
+                            <div>
+                                <strong>build-release-enhanced.bat</strong>
+                                <p style="color: #666; font-size: 0.9em; margin-top: 5px;">增强版构建脚本（自动清理文件占用）</p>
+                            </div>
+                            <span class="badge badge-primary">备用</span>
+                        </div>
+
+                        <div class="file-item">
+                            <div>
+                                <strong>rename-and-prepare-release.bat</strong>
+                                <p style="color: #666; font-size: 0.9em; margin-top: 5px;">重命名并准备发布文件</p>
+                            </div>
+                            <span class="badge badge-success">必用</span>
+                        </div>
+
+                        <div class="file-item">
+                            <div>
+                                <strong>key.properties</strong>
+                                <p style="color: #666; font-size: 0.9em; margin-top: 5px;">签名配置文件</p>
+                            </div>
+                            <span class="badge badge-danger">敏感</span>
+                        </div>
+
+                        <div class="file-item">
+                            <div>
+                                <strong>lemontv-release.jks</strong>
+                                <p style="color: #666; font-size: 0.9em; margin-top: 5px;">签名密钥库</p>
+                            </div>
+                            <span class="badge badge-danger">敏感</span>
+                        </div>
+
+                        <div class="file-item">
+                            <div>
+                                <strong>RELEASE_GUIDE.html</strong>
+                                <p style="color: #666; font-size: 0.9em; margin-top: 5px;">本教程文件</p>
+                            </div>
+                            <span class="badge badge-primary">文档</span>
+                        </div>
+                    </div>
+
+                    <div class="warning-box" style="margin-top: 20px;">
+                        <strong>🔒 安全提示：</strong>
+                        <p style="margin-top: 10px;">
+                            <code>key.properties</code> 和 <code>*.jks</code> 文件包含签名密钥，
+                            <strong>绝对不要</strong>上传到 GitHub 或公开分享！
+                            这些文件已添加到 <code>.gitignore</code>。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 常见问题 -->
+            <div class="step" onclick="toggleAccordion(this)">
+                <span class="step-number">❓</span>
+                <h2>常见问题 FAQ</h2>
+                <div class="step-content accordion-content">
+                    <h3>Q1: 构建时提示 "Unable to delete directory"</h3>
+                    <div class="info-box">
+                        <strong>解决方案：</strong>
+                        <ul style="margin-top: 10px;">
+                            <li>使用 <code>build-release.bat</code>（已移除 clean 任务）</li>
+                            <li>或使用 <code>build-release-enhanced.bat</code>（自动清理）</li>
+                            <li>手动关闭文件资源管理器和 Android Studio</li>
+                        </ul>
+                    </div>
+
+                    <h3 style="margin-top: 20px;">Q2: 上传后文件名被修改了怎么办？</h3>
+                    <div class="info-box">
+                        <strong>解决方案：</strong>
+                        <p style="margin-top: 10px;">
+                            GitHub <strong>不会修改</strong>上传的文件名。如果看到不同的文件名，
+                            可能是浏览器下载时自动添加的。原始文件名在 Release 页面始终保持不变。
+                        </p>
+                    </div>
+
+                    <h3 style="margin-top: 20px;">Q3: APP 检测不到更新</h3>
+                    <div class="info-box">
+                        <strong>检查项：</strong>
+                        <ol style="margin-top: 10px; padding-left: 20px;">
+                            <li>确认 Release 勾选了 "Set as the latest release"</li>
+                            <li>访问 API 地址确认能返回数据：<br>
+                                <code>https://api.github.com/repos/jia070310/lemonTV/releases/latest</code>
+                            </li>
+                            <li>检查 APP 中的版本号配置是否正确</li>
+                            <li>清除 APP 缓存后重试</li>
+                        </ol>
+                    </div>
+
+                    <h3 style="margin-top: 20px;">Q4: 如何撤回或删除 Release？</h3>
+                    <div class="info-box">
+                        <strong>操作步骤：</strong>
+                        <ol style="margin-top: 10px; padding-left: 20px;">
+                            <li>访问 Releases 页面</li>
+                            <li>找到对应的 Release，点击右上角 "Edit"</li>
+                            <li>滚动到底部，点击 "Delete this release"</li>
+                            <li>确认删除（注意：Tag 仍会保留，需单独删除）</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 进度条 -->
+            <div style="margin-top: 40px;">
+                <h3>📊 发布进度</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress">0%</div>
+                </div>
+                <p style="text-align: center; color: #666; margin-top: 10px;">
+                    点击上方步骤查看详情，完成后进度会自动更新
+                </p>
+            </div>
+
+            <!-- 快速链接 -->
+            <div style="margin-top: 40px; text-align: center;">
+                <h3>🔗 快速链接</h3>
+                <div style="margin-top: 20px;">
+                    <a href="https://github.com/jia070310/lemonTV" target="_blank" class="btn" style="margin: 10px;">
+                        📦 GitHub 仓库
+                    </a>
+                    <a href="https://github.com/jia070310/lemonTV/releases" target="_blank" class="btn" style="margin: 10px;">
+                        🚀 Releases 页面
+                    </a>
+                    <a href="https://github.com/jia070310/lemonTV/releases/new" target="_blank" class="btn" style="margin: 10px;">
+                        ➕ 创建新 Release
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>🍋 <strong>柠檬TV</strong> - 轻量级智能电视直播应用</p>
+            <p style="margin-top: 10px;">
+                <a href="https://github.com/jia070310/lemonTV" target="_blank">GitHub</a> | 
+                <a href="https://github.com/jia070310/lemonTV/issues" target="_blank">Issues</a> | 
+                <a href="https://github.com/jia070310/lemonTV/discussions" target="_blank">Discussions</a>
+            </p>
+            <p style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">
+                Version 1.0.1 | © 2026 LemonTV
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // 折叠/展开功能
+        function toggleAccordion(element) {
+            const content = element.querySelector('.accordion-content');
+            const isActive = content.classList.contains('active');
+            
+            // 关闭所有其他折叠项
+            document.querySelectorAll('.accordion-content').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // 切换当前项
+            if (!isActive) {
+                content.classList.add('active');
+                updateProgress();
+            }
+        }
+
+        // 复制代码功能
+        function copyCode(button, event) {
+            event.stopPropagation();
+            const codeBlock = button.nextElementSibling;
+            const text = codeBlock.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.textContent;
+                button.textContent = '✓ 已复制';
+                button.style.background = '#28a745';
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = '#FDDD0E';
+                }, 2000);
+            });
+        }
+
+        // 更新进度条
+        function updateProgress() {
+            const totalSteps = document.querySelectorAll('.step').length - 2; // 减去工具文件说明和FAQ
+            const activeSteps = document.querySelectorAll('.accordion-content.active').length;
+            const progress = Math.min(100, Math.round((activeSteps / totalSteps) * 100));
+            
+            const progressBar = document.getElementById('progress');
+            progressBar.style.width = progress + '%';
+            progressBar.textContent = progress + '%';
+        }
+
+        // 页面加载时展开第一步
+        window.addEventListener('load', () => {
+            const firstStep = document.querySelector('.step');
+            if (firstStep) {
+                firstStep.querySelector('.accordion-content').classList.add('active');
+                updateProgress();
+            }
+        });
+
+        // 平滑滚动
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

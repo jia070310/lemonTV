@@ -1,0 +1,624 @@
+
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>柠檬TV设置界面 - 优化版</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #0f0f23;
+            color: #e0e0e0;
+        }
+        .card-hover:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.2);
+            transition: all 0.3s ease;
+        }
+        .status-badge {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .glow-border {
+            border: 1px solid transparent;
+            background: linear-gradient(#0f0f23, #0f0f23) padding-box,
+                        linear-gradient(135deg, #6366f1, #8b5cf6) border-box;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-[#0a0a16] text-gray-200 overflow-hidden font-sans">
+<!-- 背景装饰流光 -->
+<div class="fixed top-0 left-0 w-full h-full pointer-events-none opacity-20 overflow-hidden">
+<div class="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-yellow-500 rounded-full blur-[120px] animate-pulse"></div>
+<div class="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-600 rounded-full blur-[120px]"></div>
+</div>
+<!-- 主容器 -->
+<div class="relative z-10 h-screen flex flex-col p-8">
+<!-- 头部信息 -->
+<header class="flex justify-between items-end mb-8 px-4">
+<div>
+<h1 class="text-5xl font-black text-white tracking-tighter flex items-center">
+<span class="text-yellow-400 mr-2">LEMON</span> TV
+                    <span class="ml-4 text-sm bg-yellow-500/20 text-yellow-400 px-3 py-1 rounded-md border border-yellow-500/30">V1.1.7 PRE_STABLE</span>
+</h1>
+<p class="text-gray-400 mt-2 text-lg">智能电视多媒体终端 - 设置中心</p>
+</div>
+<div class="text-right">
+<div class="text-3xl font-mono font-medium text-white" id="clock">14:30:05</div>
+<div class="text-gray-500 text-sm">2026年02月21日 | 星期六</div>
+</div>
+</header>
+<!-- 设置宫格区 -->
+<main class="flex-1 grid grid-cols-12 gap-8 overflow-hidden">
+<!-- 左侧：主要功能分类（垂直侧边栏） -->
+<div class="col-span-3 flex flex-col space-y-4 pr-4">
+<div class="focusable group bg-white/5 p-6 rounded-3xl border border-white/10 hover:border-yellow-400 focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none transition-all duration-300 transform focus:scale-105 cursor-pointer active-tab" onclick="switchTab('general')" tabindex="1">
+<div class="flex items-center space-x-4">
+<div class="w-12 h-12 rounded-2xl bg-yellow-400/20 flex items-center justify-center text-yellow-400 group-focus:bg-yellow-400 group-focus:text-black">
+<i class="fas fa-cog text-2xl"></i>
+</div>
+<div>
+<div class="text-xl font-bold text-white group-focus:text-yellow-400">常规设置</div>
+<div class="text-sm text-gray-400">界面、自启、显示</div>
+</div>
+</div>
+</div>
+<div class="focusable group bg-white/5 p-6 rounded-3xl border border-white/10 hover:border-blue-400 focus:border-blue-400 focus:bg-blue-400/10 focus:outline-none transition-all duration-300 transform focus:scale-105 cursor-pointer" onclick="switchTab('data')" tabindex="2">
+<div class="flex items-center space-x-4">
+<div class="w-12 h-12 rounded-2xl bg-blue-400/20 flex items-center justify-center text-blue-400 group-focus:bg-blue-400 group-focus:text-black">
+<i class="fas fa-database text-2xl"></i>
+</div>
+<div>
+<div class="text-xl font-bold text-white group-focus:text-blue-400">数据设置</div>
+<div class="text-sm text-gray-400">直播源、网络、同步</div>
+</div>
+</div>
+</div>
+<div class="focusable group bg-white/5 p-6 rounded-3xl border border-white/10 hover:border-purple-400 focus:border-purple-400 focus:bg-purple-400/10 focus:outline-none transition-all duration-300 transform focus:scale-105 cursor-pointer" onclick="switchTab('advanced')" tabindex="3">
+<div class="flex items-center space-x-4">
+<div class="w-12 h-12 rounded-2xl bg-purple-400/20 flex items-center justify-center text-purple-400 group-focus:bg-purple-400 group-focus:text-black">
+<i class="fas fa-microchip text-2xl"></i>
+</div>
+<div>
+<div class="text-xl font-bold text-white group-focus:text-purple-400">高级选项</div>
+<div class="text-sm text-gray-400">调试、日志、关于</div>
+</div>
+</div>
+</div>
+<div class="mt-auto space-y-4 pb-4">
+<div class="p-5 bg-white/5 rounded-2xl border border-white/5">
+<div class="text-xs text-gray-500 mb-2 italic">系统状态</div>
+<div class="flex items-center text-green-400 text-sm">
+<span class="w-2 h-2 bg-green-500 rounded-full mr-2 status-badge"></span>
+                            网络已连接 (192.168.1.108)
+                        </div>
+<div class="text-xs text-gray-500 mt-2">存储: 12.4GB / 32GB</div>
+</div>
+</div>
+</div>
+<!-- 右侧：详情面板 -->
+<div class="col-span-9 flex flex-col bg-white/5 rounded-[40px] border border-white/10 p-8 overflow-hidden relative">
+<!-- 常规设置面板 -->
+<div class="content-panel space-y-8 overflow-y-auto custom-scrollbar pr-4" id="panel-general">
+<div class="flex items-center justify-between">
+<h2 class="text-3xl font-bold text-white flex items-center">
+<i class="fas fa-sliders-h mr-3 text-yellow-500"></i> 常规区域
+                        </h2>
+</div>
+<div class="grid grid-cols-2 gap-6">
+<!-- 原应用项内容 -->
+<div class="focusable bg-white/5 p-5 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none flex items-center justify-between" tabindex="4">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mr-4"><i class="fas fa-power-off text-yellow-400"></i></div>
+<div><div class="font-medium">开机自启动</div><div class="text-xs text-gray-500">设备开机后自动运行</div></div>
+</div>
+<div class="w-12 h-6 bg-yellow-500 rounded-full relative"><div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div>
+</div>
+<div class="focusable bg-white/5 p-5 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none flex items-center justify-between" tabindex="5">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mr-4"><i class="fas fa-tv text-yellow-400"></i></div>
+<div><div class="font-medium">显示模式</div><div class="text-xs text-gray-500">1080P / HDR</div></div>
+</div>
+<div class="text-yellow-400 text-sm font-bold">全屏/填充</div>
+</div>
+<!-- 原界面项内容 -->
+<div class="focusable bg-white/5 p-5 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none flex items-center justify-between" tabindex="6">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mr-4"><i class="fas fa-stream text-yellow-400"></i></div>
+<div><div class="font-medium">节目进度显示</div><div class="text-xs text-gray-500">播放时显示实时进度</div></div>
+</div>
+<div class="w-12 h-6 bg-gray-600 rounded-full relative"><div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full"></div></div>
+</div>
+<div class="focusable bg-white/5 p-5 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none flex items-center justify-between" tabindex="7">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mr-4"><i class="fas fa-list text-yellow-400"></i></div>
+<div><div class="font-medium">经典选台界面</div><div class="text-xs text-gray-500">还原传统数字电视风格</div></div>
+</div>
+<div class="text-sm text-gray-300">已启用</div>
+</div>
+<div class="focusable bg-white/5 p-5 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none flex items-center justify-between" tabindex="8">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mr-4"><i class="fas fa-clock text-yellow-400"></i></div>
+<div><div class="font-medium">时间显示</div><div class="text-xs text-gray-500">状态栏显示系统时钟</div></div>
+</div>
+<div class="text-sm text-gray-300">开启</div>
+</div>
+<div class="focusable bg-white/5 p-5 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none flex items-center justify-between" tabindex="9">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mr-4"><i class="fas fa-hourglass-end text-yellow-400"></i></div>
+<div><div class="font-medium">超时自动关闭</div><div class="text-xs text-gray-500">菜单无操作后隐藏</div></div>
+</div>
+<div class="text-sm text-yellow-400">5 秒</div>
+</div>
+<div class="focusable bg-white/5 p-5 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none flex items-center justify-between" tabindex="10">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mr-4"><i class="fas fa-expand text-yellow-400"></i></div>
+<div><div class="font-medium">界面整体缩放</div><div class="text-xs text-gray-500">调整全屏元素大小</div></div>
+</div>
+<div class="text-sm text-yellow-400">100%</div>
+</div>
+<div class="focusable bg-white/5 p-5 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none flex items-center justify-between" tabindex="11">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mr-4"><i class="fas fa-font text-yellow-400"></i></div>
+<div><div class="font-medium">界面字体缩放</div><div class="text-xs text-gray-500">调整全局字体大小</div></div>
+</div>
+<div class="text-sm text-yellow-400">正常</div>
+</div>
+</div>
+</div>
+<!-- 数据设置面板 (默认隐藏) -->
+<div class="content-panel hidden space-y-8 overflow-y-auto custom-scrollbar pr-4 pb-20" id="panel-data">
+<div class="flex items-center justify-between">
+<h2 class="text-3xl font-bold text-white flex items-center">
+<i class="fas fa-database mr-3 text-yellow-400"></i> 数据与功能设置
+                        </h2>
+<span class="text-sm text-gray-500">2026-02-21 状态: 已同步</span>
+</div>
+<!-- 1. 直播源设置 -->
+<div class="space-y-4">
+<h3 class="text-xl font-semibold text-gray-400 flex items-center px-2">
+<span class="w-1.5 h-6 bg-yellow-400 rounded-full mr-3"></span>直播源
+                        </h3>
+<div class="grid grid-cols-3 gap-4">
+<div class="focusable bg-white/5 p-4 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none transition-all" tabindex="20">
+<div class="flex justify-between items-start mb-2">
+<span class="font-medium">数字选台</span>
+<div class="w-10 h-6 bg-yellow-500 rounded-full flex items-center px-1 shadow-inner"><div class="w-4 h-4 bg-white rounded-full ml-auto"></div></div>
+</div>
+<div class="text-xs text-gray-500">通过数字直接选择频道</div>
+</div>
+<div class="focusable bg-white/5 p-4 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none transition-all" tabindex="21">
+<div class="flex justify-between items-start mb-2">
+<span class="font-medium text-gray-400 text-opacity-80">换台反转</span>
+<div class="w-10 h-6 bg-gray-700 rounded-full flex items-center px-1"><div class="w-4 h-4 bg-gray-500 rounded-full"></div></div>
+</div>
+<div class="text-xs text-gray-500">反转上下方向键逻辑</div>
+</div>
+<div class="focusable bg-white/5 p-4 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none transition-all" tabindex="22">
+<div class="flex justify-between items-start mb-2">
+<span class="font-mediumText-gray-400 text-opacity-80">直播源精简</span>
+<div class="w-10 h-6 bg-gray-700 rounded-full flex items-center px-1"><div class="w-4 h-4 bg-gray-500 rounded-full"></div></div>
+</div>
+<div class="text-xs text-gray-500">隐藏重复过多的源</div>
+</div>
+<div class="focusable bg-white/5 p-4 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none transition-all" tabindex="23">
+<div class="flex justify-between items-center mb-1">
+<span class="font-medium">缓存时间</span>
+<span class="text-yellow-400 font-mono">24小时</span>
+</div>
+<div class="text-xs text-gray-500">短按+1h，长按设为0h</div>
+</div>
+<div class="focusable bg-white/5 p-4 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none transition-all" tabindex="24">
+<div class="flex justify-between items-center mb-1">
+<span class="font-medium">自定义直播源</span>
+<span class="text-gray-500">未启用</span>
+</div>
+<div class="text-xs text-gray-500">支持远程 URL 挂载</div>
+</div>
+<button class="focusable bg-white/10 hover:bg-red-500/20 p-4 rounded-2xl border border-transparent focus:border-red-500 focus:bg-red-500/10 focus:outline-none transition-all text-left" tabindex="25">
+<div class="font-medium text-red-400">清除缓存</div>
+<div class="text-xs text-gray-500">立即释放直播存储空间</div>
+</button>
+</div>
+</div>
+<!-- 2. 节目单设置 -->
+<div class="space-y-4">
+<h3 class="text-xl font-semibold text-gray-400 flex items-center px-2">
+<span class="w-1.5 h-6 bg-blue-400 rounded-full mr-3"></span>节目单 (EPG)
+                        </h3>
+<div class="grid grid-cols-3 gap-4">
+<div class="focusable bg-white/5 p-4 rounded-2xl border border-transparent focus:border-blue-400 focus:bg-blue-400/10 focus:outline-none transition-all" tabindex="26">
+<div class="flex justify-between items-start mb-2">
+<span class="font-medium">节目单启用</span>
+<div class="w-10 h-6 bg-blue-500 rounded-full flex items-center px-1 shadow-inner"><div class="w-4 h-4 bg-white rounded-full ml-auto"></div></div>
+</div>
+<div class="text-xs text-gray-500">首屏加载有微小波动风险</div>
+</div>
+<div class="focusable bg-white/5 p-4 rounded-2xl border border-transparent focus:border-blue-400 focus:bg-blue-400/10 focus:outline-none transition-all" tabindex="27">
+<div class="flex justify-between items-center mb-1">
+<span class="font-medium">刷新时间阈值</span>
+<span class="text-blue-400 font-mono">2小时</span>
+</div>
+<div class="text-xs text-gray-500">间隔不到 2h 不会刷新</div>
+</div>
+<div class="focusable bg-white/5 p-4 rounded-2xl border border-transparent focus:border-blue-400 focus:bg-blue-400/10 focus:outline-none transition-all" tabindex="28">
+<div class="flex justify-between items-center mb-1">
+<span class="font-medium">自定义 EPG</span>
+<span class="text-gray-500 font-mono">未启用</span>
+</div>
+<div class="text-xs text-gray-500">配置第三方 XML 表格</div>
+</div>
+<button class="focusable bg-white/10 p-4 rounded-2xl border border-transparent focus:border-blue-400 focus:bg-blue-400/10 focus:outline-none transition-all text-left" tabindex="29">
+<div class="font-medium text-white">清除 EPG 缓存</div>
+<div class="text-xs text-gray-500">删除已存储的节目快照</div>
+</button>
+<button class="focusable bg-blue-500/80 p-4 rounded-2xl border border-transparent focus:border-white focus:bg-blue-400 focus:outline-none transition-all text-left" tabindex="30">
+<div class="font-medium text-white">立即刷新节目单</div>
+<div class="text-xs text-blue-100">清除并强制重新下载</div>
+</button>
+</div>
+</div>
+<!-- 3. 收藏设置 -->
+<div class="grid grid-cols-2 gap-8">
+<div class="space-y-4">
+<h3 class="text-xl font-semibold text-gray-400 flex items-center px-2">
+<span class="w-1.5 h-6 bg-purple-400 rounded-full mr-3"></span>收藏管理
+                            </h3>
+<div class="flex flex-col space-y-3">
+<div class="focusable bg-white/5 p-4 rounded-2xl border border-transparent focus:border-purple-400 focus:bg-purple-400/10 focus:outline-none flex justify-between items-center" tabindex="31">
+<div><div class="font-medium">收藏功能启用</div><div class="text-xs text-gray-500">启用个人频道中心</div></div>
+<div class="w-10 h-6 bg-purple-500 rounded-full flex items-center px-1 shadow-inner"><div class="w-4 h-4 bg-white rounded-full ml-auto"></div></div>
+</div>
+<div class="focusable bg-white/5 p-4 rounded-2xl border border-transparent focus:border-purple-400 focus:bg-purple-400/10 focus:outline-none flex justify-between items-center" tabindex="32">
+<div><div class="font-medium">当前已收藏</div><div class="text-xs text-gray-500">包含不存在源中的频道</div></div>
+<span class="text-purple-400 font-bold">0 个频道</span>
+</div>
+<button class="focusable bg-red-500/10 p-4 rounded-2xl border border-transparent focus:border-red-500 focus:outline-none flex justify-between items-center text-left" tabindex="33">
+<div><div class="font-medium text-red-400">清空全部收藏</div><div class="text-xs text-gray-500">短按立即清空所有收藏</div></div>
+<i class="fas fa-trash-alt text-red-500/50"></i>
+</button>
+</div>
+</div>
+<!-- 4 & 5. 播放器与网络 -->
+<div class="space-y-4">
+<h3 class="text-xl font-semibold text-gray-400 flex items-center px-2">
+<span class="w-1.5 h-6 bg-green-400 rounded-full mr-3"></span>硬件与网络
+                            </h3>
+<div class="grid grid-cols-1 gap-3">
+<div class="focusable bg-white/5 p-4 rounded-2xl border border-transparent focus:border-green-400 focus:bg-green-400/10 focus:outline-none" tabindex="34">
+<div class="flex justify-between items-center">
+<span class="font-medium text-sm text-gray-400 uppercase">播放器配置</span>
+<div class="flex space-x-4 text-xs">
+<span>比例: <b class="text-white">原始</b></span>
+<span>超时: <b class="text-white">15秒</b></span>
+</div>
+</div>
+<div class="mt-2 text-xs text-gray-500">自定义 UA (User-Agent): <span class="text-gray-400">未启用</span></div>
+</div>
+<div class="focusable bg-white/5 p-4 rounded-2xl border border-transparent focus:border-green-400 focus:bg-green-400/10 focus:outline-none" tabindex="35">
+<div class="flex justify-between items-center">
+<span class="font-medium text-sm text-gray-400 uppercase">网络请求策略</span>
+<i class="fas fa-lock text-[10px] text-gray-600"></i>
+</div>
+<div class="mt-2 grid grid-cols-2 gap-4">
+<div><div class="text-[10px] text-gray-500">重试次数</div><div class="font-mono text-white">10 次</div></div>
+<div><div class="text-[10px] text-gray-500">重试间隔</div><div class="font-mono text-white">3 秒</div></div>
+</div>
+<div class="mt-2 text-[10px] text-gray-400">影响直播源、节目单数据获取稳定性</div>
+</div>
+</div>
+</div>
+</div>
+</div> </div>
+<div class="text-green-500 text-sm">极佳</div>
+</main></div>
+
+
+<!-- 高级选项面板 (默认隐藏) -->
+<div class="content-panel hidden space-y-8 overflow-y-auto custom-scrollbar pr-4" id="panel-advanced">
+<div class="flex items-center justify-between">
+<h2 class="text-3xl font-bold text-white flex items-center">
+<i class="fas fa-microchip mr-3 text-purple-500"></i> 高级与系统
+                        </h2>
+</div>
+<div class="grid grid-cols-2 gap-6">
+<div class="focusable bg-white/5 p-5 rounded-2xl border border-transparent focus:border-purple-400 focus:bg-purple-400/10 focus:outline-none flex items-center justify-between" tabindex="17">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-purple-400/20 rounded-xl flex items-center justify-center mr-4"><i class="fas fa-info-circle text-purple-400"></i></div>
+<div><div class="font-medium">关于系统</div><div class="text-xs text-gray-500">Lemon TV Pro v1.1.7</div></div>
+</div>
+<span class="text-xs bg-white/10 px-2 py-1 rounded text-purple-300">开源协议</span>
+</div>
+<div class="focusable bg-white/5 p-5 rounded-2xl border border-transparent focus:border-purple-400 focus:bg-purple-400/10 focus:outline-none flex items-center justify-between" tabindex="18">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-purple-400/20 rounded-xl flex items-center justify-center mr-4"><i class="fas fa-arrow-alt-circle-up text-purple-400"></i></div>
+<div><div class="font-medium">检查更新</div><div class="text-xs text-gray-500">最新版本: v1.1.8-Beta</div></div>
+</div>
+<div class="w-2 h-2 bg-red-500 rounded-full"></div>
+</div>
+<div class="focusable bg-white/5 p-5 rounded-2xl border border-transparent focus:border-purple-400 focus:bg-purple-400/10 focus:outline-none flex items-center justify-between" tabindex="19">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-purple-400/20 rounded-xl flex items-center justify-center mr-4"><i class="fas fa-bug text-purple-400"></i></div>
+<div><div class="font-medium">调试模式</div><div class="text-xs text-gray-500">开启开发者调试菜单</div></div>
+</div>
+<div class="w-12 h-6 bg-gray-600 rounded-full relative"><div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full"></div></div>
+</div>
+<div class="focusable bg-white/5 p-5 rounded-2xl border border-transparent focus:border-purple-400 focus:bg-purple-400/10 focus:outline-none flex items-center justify-between" tabindex="20">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-purple-400/20 rounded-xl flex items-center justify-center mr-4"><i class="fas fa-file-alt text-purple-400"></i></div>
+<div><div class="font-medium">运行日志</div><div class="text-xs text-gray-500">查看/导出系统错误记录</div></div>
+</div>
+<i class="fas fa-terminal text-gray-600"></i>
+</div>
+<div class="focusable bg-white/5 p-5 rounded-2xl border border-transparent focus:border-purple-400 focus:bg-purple-400/10 focus:outline-none flex items-center justify-between" tabindex="21">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-purple-400/20 rounded-xl flex items-center justify-center mr-4"><i class="fas fa-tools text-purple-400"></i></div>
+<div><div class="font-medium">实验性设置</div><div class="text-xs text-gray-500">预览未来版本核心功能</div></div>
+</div>
+<i class="fas fa-flask text-gray-600"></i>
+</div>
+</div>
+</div>
+<!-- 底部交互条 -->
+<div class="mt-auto flex justify-between items-center bg-white/5 -m-8 mt-8 p-6 px-8 border-t border-white/10">
+<div class="flex space-x-6">
+<div class="flex items-center text-gray-500">
+<div class="w-8 h-8 rounded bg-white/10 flex items-center justify-center mr-2 text-xs font-bold ring-1 ring-white/20">OK</div>
+<span class="text-sm">确认修改</span>
+</div>
+<div class="flex items-center text-gray-500">
+<div class="w-8 h-8 rounded bg-white/10 flex items-center justify-center mr-2 text-xs ring-1 ring-white/20"><i class="fas fa-arrow-left"></i></div>
+<span class="text-sm">取消返回</span>
+</div>
+</div>
+<div class="flex space-x-4">
+<button class="focusable px-8 py-3 bg-white/5 border border-white/10 text-white rounded-2xl focus:bg-white focus:text-black transition-all outline-none" tabindex="22">恢复出厂设置</button>
+<button class="focusable px-8 py-3 bg-yellow-500 text-black font-bold rounded-2xl focus:ring-4 focus:ring-yellow-400/50 transition-all outline-none" tabindex="23">保存并生效</button>
+</div>
+</div>
+
+
+flex items-center space-x-4"&gt;
+                        <div class="w-12 h-12 rounded-2xl bg-blue-400/20 flex items-center justify-center text-blue-400 group-focus:bg-blue-400 group-focus:text-black">
+<i class="fas fa-play-circle text-2xl"></i>
+</div>
+<div>
+<div class="text-xl font-bold text-white group-focus:text-blue-400">播放控制</div>
+<div class="text-sm text-gray-400">解码、渲染、比例</div>
+</div>
+
+
+<div class="focusable group bg-white/5 p-6 rounded-3xl border border-white/10 hover:border-green-400 focus:border-green-400 focus:bg-green-400/10 focus:outline-none transition-all duration-300 transform focus:scale-105 cursor-pointer" tabindex="3">
+<div class="flex items-center space-x-4">
+<div class="w-12 h-12 rounded-2xl bg-green-400/20 flex items-center justify-center text-green-400 group-focus:bg-green-400 group-focus:text-black">
+<i class="fas fa-network-wired text-2xl"></i>
+</div>
+<div>
+<div class="text-xl font-bold text-white group-focus:text-green-400">数据缓存</div>
+<div class="text-sm text-gray-400">接口、节目单、清理</div>
+</div>
+</div>
+</div>
+<div class="focusable group bg-white/5 p-6 rounded-3xl border border-white/10 hover:border-purple-400 focus:border-purple-400 focus:bg-purple-400/10 focus:outline-none transition-all duration-300 transform focus:scale-105 cursor-pointer" tabindex="4">
+<div class="flex items-center space-x-4">
+<div class="w-12 h-12 rounded-2xl bg-purple-400/20 flex items-center justify-center text-purple-400 group-focus:bg-purple-400 group-focus:text-black">
+<i class="fas fa-tools text-2xl"></i>
+</div>
+<div>
+<div class="text-xl font-bold text-white group-focus:text-purple-400">高级选项</div>
+<div class="text-sm text-gray-400">调试、UA、开发者</div>
+</div>
+</div>
+</div>
+
+<!-- 右侧：详细控制块 -->
+<div class="col-span-9 bg-white/5 rounded-[40px] border border-white/10 p-8 grid grid-cols-2 gap-6 overflow-y-auto custom-scrollbar">
+<!-- 卡片：系统状态 -->
+<div class="col-span-1 bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl p-6 border border-white/5 flex flex-col justify-between">
+<div>
+<div class="text-gray-400 text-sm mb-1 uppercase tracking-widest">System Status</div>
+<h3 class="text-2xl font-bold text-white mb-4">应用负载</h3>
+<div class="space-y-4">
+<div>
+<div class="flex justify-between text-sm mb-1">
+<span>内存占用</span>
+<span class="text-yellow-400">42%</span>
+</div>
+<div class="w-full bg-black/40 h-2 rounded-full overflow-hidden">
+<div class="bg-yellow-400 h-full w-[42%]"></div>
+</div>
+</div>
+<div class="flex justify-between items-center bg-black/20 p-3 rounded-xl border border-white/5">
+<span class="text-sm">直播源缓存</span>
+<span class="font-mono text-xl text-cyan-400">24.5MB</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3 mt-4">
+<button class="focusable py-3 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded-xl transition-all focus:outline-none focus:ring-4 focus:ring-red-500/50" tabindex="5">
+                            清除缓存
+                        </button>
+<button class="focusable py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all focus:outline-none focus:ring-4 focus:ring-white/30" tabindex="6">
+                            立即检查更新
+                        </button>
+</div>
+</div>
+<!-- 卡片：播放配置 -->
+<div class="col-span-1 bg-gray-900/40 rounded-3xl p-6 border border-white/5">
+<h3 class="text-xl font-bold text-white mb-6 flex items-center">
+<i class="fas fa-sliders-h mr-3 text-yellow-400"></i>播放偏好
+                    </h3>
+<div class="space-y-3">
+<div class="focusable flex items-center justify-between p-3 bg-white/5 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none group" tabindex="7">
+<span class="group-focus:text-yellow-400">开机自动播放</span>
+<div class="w-12 h-6 bg-gray-700 rounded-full relative">
+<div class="absolute right-1 top-1 w-4 h-4 bg-yellow-400 rounded-full"></div>
+</div>
+</div>
+<div class="focusable flex items-center justify-between p-3 bg-white/5 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none group" tabindex="8">
+<span class="group-focus:text-yellow-400">经典选台菜单</span>
+<div class="w-12 h-6 bg-gray-700 rounded-full relative">
+<div class="absolute right-1 top-1 w-4 h-4 bg-yellow-400 rounded-full"></div>
+</div>
+</div>
+<div class="focusable flex items-center justify-between p-3 bg-white/5 rounded-2xl border border-transparent focus:border-yellow-400 focus:bg-yellow-400/10 focus:outline-none group" tabindex="9">
+<span class="group-focus:text-yellow-400">视频播放比例</span>
+<span class="bg-yellow-500/20 text-yellow-500 px-3 py-1 rounded text-sm">自动填充</span>
+</div>
+</div>
+</div>
+<!-- 卡片：高级调试 -->
+<div class="col-span-2 bg-gray-900/40 rounded-3xl p-6 border border-white/5">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-xl font-bold text-white flex items-center">
+<i class="fas fa-bug mr-3 text-purple-400"></i>高级与开发者选项
+                        </h3>
+<span class="text-xs text-gray-500 uppercase tracking-widest">Advanced Mode</span>
+</div>
+<div class="grid grid-cols-3 gap-4">
+<div class="focusable p-4 bg-white/5 rounded-2xl border border-transparent focus:border-purple-400 focus:bg-purple-400/10 focus:outline-none text-center group" tabindex="10">
+<div class="text-2xl mb-1 text-gray-500 group-focus:text-purple-400"><i class="fas fa-tachometer-alt"></i></div>
+<div class="text-xs">显示帧率(FPS)</div>
+<div class="text-[10px] text-gray-500 mt-1">关闭</div>
+</div>
+<div class="focusable p-4 bg-white/5 rounded-2xl border border-transparent focus:border-purple-400 focus:bg-purple-400/10 focus:outline-none text-center group" tabindex="11">
+<div class="text-2xl mb-1 text-gray-500 group-focus:text-purple-400"><i class="fas fa-info-circle"></i></div>
+<div class="text-xs">播放器信息流</div>
+<div class="text-[10px] text-gray-500 mt-1">已开启</div>
+</div>
+<div class="focusable p-4 bg-white/5 rounded-2xl border border-transparent focus:border-purple-400 focus:bg-purple-400/10 focus:outline-none text-center group" tabindex="12">
+<div class="text-2xl mb-1 text-gray-500 group-focus:text-purple-400"><i class="fas fa-user-secret"></i></div>
+<div class="text-xs">自定义UA标识</div>
+<div class="text-[10px] text-gray-500 mt-1">Lemon_TV_Pro</div>
+</div>
+</div>
+</div>
+<!-- 底部交互条 -->
+<div class="col-span-2 flex justify-between items-center mt-4">
+<div class="flex space-x-6">
+<div class="flex items-center text-gray-500">
+<div class="w-8 h-8 rounded bg-white/10 flex items-center justify-center mr-2 text-xs font-bold">OK</div>
+<span class="text-sm">确认修改</span>
+</div>
+<div class="flex items-center text-gray-500">
+<div class="w-8 h-8 rounded bg-white/10 flex items-center justify-center mr-2 text-xs">
+<i class="fas fa-arrow-left"></i>
+</div>
+<span class="text-sm">返回播放</span>
+</div>
+</div>
+<div class="flex space-x-4">
+<button class="focusable px-8 py-3 bg-white/5 border border-white/10 text-white rounded-2xl focus:bg-white focus:text-black transition-all outline-none" tabindex="13">恢复默认</button>
+<button class="focusable px-8 py-3 bg-yellow-500 text-black font-bold rounded-2xl focus:ring-4 focus:ring-yellow-400/50 transition-all outline-none" tabindex="14">应用并重启</button>
+</div>
+</div>
+</div>
+
+
+<style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        .focusable:focus {
+            transform: scale(1.02);
+            box-shadow: 0 0 30px rgba(234, 179, 8, 0.1);
+        }
+        /* 隐藏滚动条但保留功能 */
+        .custom-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+        }
+    </style>
+<script>
+        // 时钟功能
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.getHours().toString().padStart(2, '0') + ':' + 
+                          now.getMinutes().toString().padStart(2, '0') + ':' + 
+                          now.getSeconds().toString().padStart(2, '0');
+            document.getElementById('clock').textContent = timeStr;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // 切换面板功能
+        function switchTab(tabId) {
+            // 隐藏所有面板
+            document.querySelectorAll('.content-panel').forEach(panel => {
+                panel.classList.add('hidden');
+            });
+            // 显示选中面板
+            const targetPanel = document.getElementById('panel-' + tabId);
+            if (targetPanel) {
+                targetPanel.classList.remove('hidden');
+                // 平滑重置滚动
+                targetPanel.scrollTop = 0;
+            }
+            
+            // 更新侧边栏激活样式
+            document.querySelectorAll('.col-span-3 .focusable').forEach(el => {
+                el.classList.remove('ring-4', 'ring-white/20');
+            });
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('ring-4', 'ring-white/20');
+            }
+        }
+
+        // 遥控器按键处理
+        document.addEventListener('keydown', (e) => {
+            const focusable = Array.from(document.querySelectorAll('.focusable:not(.hidden)'));
+            let current = focusable.indexOf(document.activeElement);
+            
+            if (e.key === 'ArrowDown') {
+                if (current < focusable.length - 1) {
+                    focusable[current + 1].focus();
+                } else {
+                    focusable[0].focus();
+                }
+                e.preventDefault();
+            } else if (e.key === 'ArrowUp') {
+                if (current > 0) {
+                    focusable[current - 1].focus();
+                } else {
+                    focusable[focusable.length - 1].focus();
+                }
+                e.preventDefault();
+            } else if (e.key === 'ArrowRight') {
+                // 如果在侧边栏，尝试跳到内容区
+                if (current >= 0 && current <= 2) {
+                    const firstInPanel = document.querySelector('.content-panel:not(.hidden) .focusable');
+                    if (firstInPanel) firstInPanel.focus();
+                }
+                e.preventDefault();
+            } else if (e.key === 'ArrowLeft') {
+                // 如果在内容区，跳回对应的侧边栏
+                if (current > 2) {
+                    focusable[0].focus(); // 简化处理：跳回第一个侧边栏项
+                }
+                e.preventDefault();
+            } else if (e.key === 'Enter') {
+                if (document.activeElement.hasAttribute('onclick')) {
+                    document.activeElement.click();
+                }
+            }
+        });
+
+        // 默认聚焦第一个
+        window.onload = () => {
+            document.querySelector('.focusable').focus();
+        };
+    </script>
+</body>
+</html>

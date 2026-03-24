@@ -9,6 +9,7 @@
 [![Release](https://img.shields.io/github/v/release/jia070310/lemonTV?style=flat-square&label=最新版本&color=fddd0e)](https://github.com/jia070310/lemonTV/releases/latest)
 [![License](https://img.shields.io/github/license/jia070310/lemonTV?style=flat-square&color=green)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-5.0%2B-brightgreen?style=flat-square&logo=android)](https://github.com/jia070310/lemonTV/releases/latest)
+[![Hypercommit](https://img.shields.io/badge/Hypercommit-DB2475)](https://hypercommit.com/lemontv)
 
 </div>
 

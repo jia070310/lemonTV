@@ -1,15 +1,17 @@
 {
   "android": {
-    "latest_version": "1.1.11",
-    "download_url": "https://github.com/jia070310/lemonTV/releases/download/v1.1.11/LemonIPTV-v1.1.11-release.apk",
+    "latest_version": "1.1.12",
+    "download_url": "https://github.com/jia070310/lemonTV/releases/download/v1.1.12/LemonIPTV-v1.1.12-release.apk",
     "update_log": [
-      "移除 APTV 默认直播源",
-      "支持删除默认直播源，可通过网页推送重新添加"
+      "应用内支持手动切换与一键测速 GitHub 加速器",
+      "后台添加的自定义加速器可在应用内自由切换",
+      "修复加速器测速失败（浏览器 UA + 并行测速）",
+      "提示可通过后台添加新的加速器地址"
     ]
   },
   "windows": {
-    "latest_version": "1.1.4",  
-    "download_url": "https://github.com/jia070310/lemonTV/releases/download/v1.1.4/LemonTV-v1.1.4-windows-x64.exe", 
+    "latest_version": "1.1.4",
+    "download_url": "https://github.com/jia070310/lemonTV/releases/download/v1.1.4/LemonTV-v1.1.4-windows-x64.exe",
     "update_log": [
       "🪟 Windows新功能"
     ]

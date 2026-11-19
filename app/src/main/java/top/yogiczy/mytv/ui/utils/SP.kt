@@ -72,6 +72,9 @@ object SP {
         /** GitHub 加速器地址 */
         GITHUB_PROXY,
 
+        /** GitHub 加速器历史（含后台自定义） */
+        GITHUB_PROXY_HISTORY_LIST,
+
         /** 是否启用数字选台 */
         IPTV_CHANNEL_NO_SELECT_ENABLE,
 
@@ -183,9 +186,35 @@ object SP {
             val raw = sp.getString(KEY.GITHUB_PROXY.name, null)
             return Constants.normalizeGithubProxy(raw ?: Constants.GITHUB_PROXY)
         }
+        set(value) {
+            val normalized = Constants.normalizeGithubProxy(value)
+            sp.edit().putString(KEY.GITHUB_PROXY.name, normalized).apply()
+            rememberGithubProxy(normalized)
+        }
+
+    /** 后台/应用内使用过的加速器历史 */
+    var githubProxyHistoryList: Set<String>
+        get() = sp.getStringSet(KEY.GITHUB_PROXY_HISTORY_LIST.name, emptySet()) ?: emptySet()
         set(value) = sp.edit()
-            .putString(KEY.GITHUB_PROXY.name, Constants.normalizeGithubProxy(value))
+            .putStringSet(
+                KEY.GITHUB_PROXY_HISTORY_LIST.name,
+                value.map(Constants::normalizeGithubProxy).toSet(),
+            )
             .apply()
+
+    /** 记住加速器（推荐列表 + 自定义）供应用内切换 */
+    fun rememberGithubProxy(proxy: String) {
+        val normalized = Constants.normalizeGithubProxy(proxy)
+        githubProxyHistoryList = githubProxyHistoryList + normalized
+    }
+
+    /**
+     * 可切换的加速器列表：推荐候选 + 历史自定义 + 当前值
+     */
+    fun getGithubProxyList(): List<String> =
+        (Constants.GITHUB_PROXY_CANDIDATES + githubProxyHistoryList + listOf(githubProxy))
+            .map(Constants::normalizeGithubProxy)
+            .distinct()
 
     /** 当前加速器下的默认直播源地址 */
     val defaultIptvSourceUrl: String
@@ -254,6 +283,7 @@ object SP {
             Constants.migrateGithubProxyUrl(url, target, previousProxy = previous)
 
         githubProxy = target
+        rememberGithubProxy(target)
         // 直接写 SP，避免 getter/setter 再套一层迁移逻辑
         sp.edit()
             .putString(KEY.IPTV_SOURCE_URL.name, migrate(iptvSourceUrl))

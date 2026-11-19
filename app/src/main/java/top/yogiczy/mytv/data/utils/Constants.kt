@@ -38,11 +38,20 @@ object Constants {
         )
 
     /**
-     * 已知的 GitHub 加速域前缀（含历史失效域），用于统一迁移到当前加速器
+     * 推荐加速器列表（应用内 / 后台均可切换）
+     * @see <a href="https://ghfast.top/">ghfast.top</a>
      */
+    val GITHUB_PROXY_CANDIDATES = listOf(
+        "https://ghproxy.net/",
+        "https://ghfast.top/",
+    )
+
+    /** 已知的 GitHub 加速域前缀（含历史失效域），用于统一迁移到当前加速器 */
     val KNOWN_GITHUB_PROXY_PREFIXES = listOf(
         "https://ghproxy.net/",
         "http://ghproxy.net/",
+        "https://ghfast.top/",
+        "http://ghfast.top/",
         "https://gh-proxy.org/",
         "http://gh-proxy.org/",
         "https://hk.gh-proxy.org/",
@@ -54,6 +63,10 @@ object Constants {
         "https://gh.ddlc.top/",
         "https://gitclone.com/",
     )
+
+    /** 测速用的小文件（raw） */
+    const val GITHUB_PROXY_TEST_RAW_URL =
+        "https://raw.githubusercontent.com/jia070310/lemonTV/main/versions.json"
 
     /**
      * 规范化加速器地址（保证以 http(s) 开头并以 / 结尾）

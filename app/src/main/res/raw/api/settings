@@ -5,6 +5,10 @@
   "epgXmlUrl": "http://example.com/epg.xml",
   "videoPlayerUserAgent": "Mozilla/5.0...",
   "githubProxy": "https://ghproxy.net/",
+  "githubProxyCandidates": [
+    "https://ghproxy.net/",
+    "https://ghfast.top/"
+  ],
   "appBootLaunch": true,
   "appDeviceDisplayType": 0,
   "debugShowFps": false,

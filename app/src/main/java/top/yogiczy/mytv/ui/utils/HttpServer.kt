@@ -80,6 +80,10 @@ object HttpServer : Loggable() {
                     handleSetSettings(request, response)
                 }
 
+                httpServer.post("/api/proxy/test") { request, response ->
+                    handleTestProxies(request, response)
+                }
+
                 httpServer.post("/api/upload/apk") { request, response ->
                     handleUploadApk(request, response, context)
                 }
@@ -160,6 +164,7 @@ object HttpServer : Loggable() {
                         epgXmlUrlName = SP.iptvSourceNameMap[SP.epgXmlUrl] ?: "",
                         videoPlayerUserAgent = SP.videoPlayerUserAgent,
                         githubProxy = SP.githubProxy,
+                        githubProxyCandidates = SP.getGithubProxyList(),
                         logHistory = Logger.history,
                     )
                 )
@@ -184,6 +189,7 @@ object HttpServer : Loggable() {
             val normalized = Constants.normalizeGithubProxy(
                 githubProxy.ifBlank { Constants.GITHUB_PROXY }
             )
+            SP.rememberGithubProxy(normalized)
             if (normalized != SP.githubProxy) {
                 SP.rewriteGithubProxyUrls(normalized)
                 showToast("加速器已更新为 $normalized，请重启应用生效")
@@ -252,6 +258,57 @@ object HttpServer : Loggable() {
         wrapResponse(response).send("success")
     }
 
+    /**
+     * 用电视本机网络测速加速器（比手机浏览器测更贴近实际播放环境）
+     * body: { "proxies": ["https://ghproxy.net/", "https://ghfast.top/"] } 可省略，默认测推荐+历史
+     */
+    private fun handleTestProxies(
+        request: AsyncHttpServerRequest,
+        response: AsyncHttpServerResponse,
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val body = try {
+                    request.getBody<JSONObjectBody>()?.get()
+                } catch (_: Exception) {
+                    null
+                }
+
+                val proxies = mutableListOf<String>()
+                val arr = body?.optJSONArray("proxies")
+                if (arr != null && arr.length() > 0) {
+                    for (i in 0 until arr.length()) {
+                        val p = arr.optString(i, "").trim()
+                        if (p.isNotBlank()) proxies.add(Constants.normalizeGithubProxy(p))
+                    }
+                }
+                if (proxies.isEmpty()) {
+                    proxies.addAll(SP.getGithubProxyList())
+                }
+
+                val results = GithubProxyTester.testProxies(proxies).map {
+                    ProxyTestResult(
+                        proxy = it.proxy,
+                        ok = it.ok,
+                        ms = it.ms,
+                        error = it.error,
+                    )
+                }
+
+                wrapResponse(response).apply {
+                    setContentType("application/json")
+                    send(Json.encodeToString(ProxyTestResponse(results = results)))
+                }
+            } catch (ex: Exception) {
+                log.e("加速器测速失败", ex)
+                wrapResponse(response).apply {
+                    code(500)
+                    send("test failed: ${ex.message}")
+                }
+            }
+        }
+    }
+
     private fun getLocalIpAddress(): String {
         val defaultIp = "0.0.0.0"
 
@@ -285,6 +342,20 @@ private data class AllSettings(
     val epgXmlUrlName: String,
     val videoPlayerUserAgent: String,
     val githubProxy: String,
+    val githubProxyCandidates: List<String> = emptyList(),
 
     val logHistory: List<Logger.HistoryItem>,
+)
+
+@Serializable
+private data class ProxyTestResult(
+    val proxy: String,
+    val ok: Boolean,
+    val ms: Long,
+    val error: String? = null,
+)
+
+@Serializable
+private data class ProxyTestResponse(
+    val results: List<ProxyTestResult>,
 )

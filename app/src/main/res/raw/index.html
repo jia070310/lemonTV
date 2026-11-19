@@ -796,32 +796,67 @@
                                     <div class="section-header">
                                         <div class="section-title">
                                             <h2>GitHub 加速器</h2>
-                                            <p>用于拉取 GitHub 直播源与更新包；失效时可在此更换可用加速地址</p>
+                                            <p>用电视本机网络测速后选择最优；也可手动填写自定义地址</p>
                                         </div>
                                         <span class="section-tag">TYPE: PROXY</span>
                                     </div>
                                     
                                     <div class="settings-card">
                                         <div class="input-group">
-                                            <label class="input-label">加速器地址</label>
+                                            <label class="input-label">推荐加速器（点选后可保存）</label>
+                                            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+                                                <label
+                                                    v-for="item in proxyOptions"
+                                                    :key="item.proxy"
+                                                    style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); cursor: pointer;"
+                                                    :style="settings.githubProxy === item.proxy ? 'border-color: var(--lemon-yellow); background: rgba(253,221,14,0.08);' : ''"
+                                                >
+                                                    <input type="radio" :value="item.proxy" v-model="settings.githubProxy" />
+                                                    <div style="flex: 1; min-width: 0;">
+                                                        <div style="font-size: 14px; word-break: break-all;">{{ item.proxy }}</div>
+                                                        <div style="font-size: 12px; color: rgba(255,255,255,0.55); margin-top: 4px;">
+                                                            <span v-if="item.ms >= 0" style="color: #4ade80;">可用 · {{ item.ms }} ms</span>
+                                                            <span v-else-if="item.error" style="color: #f87171;">失败 · {{ item.error }}</span>
+                                                            <span v-else>未测速</span>
+                                                            <span v-if="item.best" style="margin-left: 8px; color: var(--lemon-yellow);">最优</span>
+                                                        </div>
+                                                    </div>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div class="input-group" style="margin-top: 8px;">
+                                            <label class="input-label">自定义加速器地址</label>
                                             <input 
                                                 v-model="settings.githubProxy" 
                                                 type="text" 
                                                 class="input-field"
-                                                placeholder="例如：https://ghproxy.net/"
+                                                placeholder="例如：https://ghfast.top/"
                                             />
                                         </div>
                                         <p style="margin: -8px 0 16px; color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.5;">
-                                            默认：https://ghproxy.net/ 。留空保存将恢复默认。修改后会自动迁移已保存的加速源地址，并需重启应用生效。
+                                            默认：https://ghproxy.net/ ；另推荐 <a href="https://ghfast.top/" target="_blank" style="color: var(--lemon-yellow);">https://ghfast.top/</a>。
+                                            测速走电视本机网络。留空保存将恢复默认；修改后需重启应用生效。
                                         </p>
-                                        
-                                        <button 
-                                            class="btn-primary" 
-                                            @click="confirmSettings()"
-                                        >
-                                            <span class="iconify" data-icon="material-symbols:save-rounded"></span>
-                                            <span>保存加速器配置</span>
-                                        </button>
+
+                                        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                                            <button 
+                                                class="btn-primary" 
+                                                style="background: transparent; border: 1px solid var(--lemon-yellow); color: var(--lemon-yellow);"
+                                                :disabled="proxyTesting"
+                                                @click="testProxies()"
+                                            >
+                                                <span class="iconify" data-icon="material-symbols:speed-outline"></span>
+                                                <span>{{ proxyTesting ? '测速中...' : '一键测速' }}</span>
+                                            </button>
+                                            <button 
+                                                class="btn-primary" 
+                                                @click="confirmSettings()"
+                                            >
+                                                <span class="iconify" data-icon="material-symbols:save-rounded"></span>
+                                                <span>保存加速器配置</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </section>
                                 
@@ -904,10 +939,85 @@
                 // 自定义源输入框（默认为空）
                 const customSourceName = ref('')
                 const customSourceUrl = ref('')
+                const proxyTesting = ref(false)
+                const proxyTestMap = ref({})
+                
+                const proxyOptions = Vue.computed(() => {
+                    const s = settings.value || {}
+                    const list = Array.isArray(s.githubProxyCandidates) ? [...s.githubProxyCandidates] : [
+                        'https://ghproxy.net/',
+                        'https://ghfast.top/',
+                    ]
+                    const current = (s.githubProxy || '').trim()
+                    if (current && !list.some(p => p === current)) list.push(current)
+
+                    let bestProxy = ''
+                    let bestMs = Number.POSITIVE_INFINITY
+                    for (const p of list) {
+                        const r = proxyTestMap.value[p]
+                        if (r && r.ok && typeof r.ms === 'number' && r.ms >= 0 && r.ms < bestMs) {
+                            bestMs = r.ms
+                            bestProxy = p
+                        }
+                    }
+
+                    return list.map(proxy => {
+                        const r = proxyTestMap.value[proxy] || {}
+                        return {
+                            proxy,
+                            ok: !!r.ok,
+                            ms: typeof r.ms === 'number' ? r.ms : -1,
+                            error: r.error || '',
+                            best: proxy === bestProxy,
+                        }
+                    })
+                })
                 
                 function switchSection(section) {
                     activeSection.value = section
                     sidebarOpen.value = false
+                }
+
+                async function testProxies() {
+                    try {
+                        proxyTesting.value = true
+                        vant.showLoadingToast({ message: '电视测速中...', forbidClick: true, duration: 0 })
+                        const candidates = (settings.value?.githubProxyCandidates || [
+                            'https://ghproxy.net/',
+                            'https://ghfast.top/',
+                        ]).slice()
+                        const current = (settings.value?.githubProxy || '').trim()
+                        if (current && !candidates.includes(current)) candidates.push(current)
+
+                        const resp = await requestApi('/api/proxy/test', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ proxies: candidates }),
+                        })
+                        const data = await resp.json()
+                        const map = {}
+                        ;(data.results || []).forEach(r => {
+                            map[r.proxy] = r
+                        })
+                        proxyTestMap.value = map
+
+                        const best = (data.results || []).find(r => r.ok)
+                        if (best) {
+                            settings.value.githubProxy = best.proxy
+                            vant.closeToast()
+                            vant.showSuccessToast(`最优：${best.ms}ms，已选中`)
+                        } else {
+                            vant.closeToast()
+                            const firstErr = (data.results || []).find(r => r.error)?.error
+                            vant.showFailToast(firstErr ? `全部失败：${firstErr}` : '全部测速失败，请检查网络或换地址')
+                        }
+                    } catch (e) {
+                        vant.closeToast()
+                        vant.showFailToast(e?.message || '测速失败')
+                        console.error(e)
+                    } finally {
+                        proxyTesting.value = false
+                    }
                 }
                 
                 // 推送自定义源
@@ -989,9 +1099,12 @@
                     settings,
                     customSourceName,
                     customSourceUrl,
+                    proxyTesting,
+                    proxyOptions,
                     switchSection,
                     pushCustomSource,
                     confirmSettings,
+                    testProxies,
                     uploaderAfterRead,
                 }
             }

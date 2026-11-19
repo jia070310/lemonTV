@@ -250,6 +250,28 @@ class LeanbackSettingsViewModel : ViewModel() {
             SP.updateForceRemind = value
         }
 
+    private var _githubProxy by mutableStateOf(SP.githubProxy)
+    var githubProxy: String
+        get() = _githubProxy
+        set(value) {
+            val normalized = top.yogiczy.mytv.data.utils.Constants.normalizeGithubProxy(value)
+            if (_githubProxy != normalized) {
+                SP.rewriteGithubProxyUrls(normalized)
+            } else {
+                SP.githubProxy = normalized
+            }
+            _githubProxy = SP.githubProxy
+            _githubProxyHistoryList = SP.githubProxyHistoryList
+        }
+
+    private var _githubProxyHistoryList by mutableStateOf(SP.githubProxyHistoryList)
+    var githubProxyHistoryList: Set<String>
+        get() = _githubProxyHistoryList
+        set(value) {
+            _githubProxyHistoryList = value
+            SP.githubProxyHistoryList = value
+        }
+
     private var _videoPlayerUserAgent by mutableStateOf(SP.videoPlayerUserAgent)
     var videoPlayerUserAgent: String
         get() = _videoPlayerUserAgent

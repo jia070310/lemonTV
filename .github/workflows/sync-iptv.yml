@@ -29,9 +29,22 @@ jobs:
     - name: Download, fix and merge source files
       id: download
       run: |
-        # 下载两个源文件
-        curl -s -L -o migu.m3u "https://raw.githubusercontent.com/ioptu/migu_video/main/migu.m3u"
-        curl -s -L -o cctv_raw.m3u "https://raw.githubusercontent.com/ioptu/migu_video/main/cctv.migu.m3u"
+        set -euo pipefail
+
+        # 源仓库为 ioptu/migu-video（连字符），旧地址 migu_video 已 404
+        curl -fsSL -o migu.m3u "https://raw.githubusercontent.com/ioptu/migu-video/main/migu.m3u"
+        curl -fsSL -o cctv_raw.m3u "https://raw.githubusercontent.com/ioptu/migu-video/main/cctv.migu.m3u"
+
+        # 下载失败时不要把 404 正文当播放列表提交
+        if ! head -1 migu.m3u | grep -q "^#EXTM3U"; then
+          echo "migu.m3u 无效（缺少 #EXTM3U）"
+          head -5 migu.m3u || true
+          exit 1
+        fi
+        if [ ! -s cctv_raw.m3u ]; then
+          echo "cctv.migu.m3u 为空"
+          exit 1
+        fi
         
         # 修正 cctv 文件：在每个 #EXTINF 行的 tvg-logo="..." 后面插入 ,group-title="央视专版",
         # 原始格式：#EXTINF:-1 tvg-id="CCTV1" tvg-name="CCTV1" tvg-logo="..."CCTV1
@@ -108,8 +121,8 @@ jobs:
           <div style="background-color: #f0f8ff; padding: 15px; border-radius: 5px;">
             <p><strong>🔄 同步状态：</strong> <span style="color: green;">✅ 成功更新</span></p>
             <p><strong>📅 更新时间：</strong> $(date -u '+%Y-%m-%d %H:%M:%S UTC')</p>
-            <p><strong>🔗 源文件1（migu.m3u）：</strong> <a href="https://github.com/ioptu/migu_video/blob/main/migu.m3u">ioptu/migu_video/migu.m3u</a> (共 ${{ steps.download.outputs.source1_lines }} 行)</p>
-            <p><strong>🔗 源文件2（cctv.migu.m3u）：</strong> <a href="https://github.com/ioptu/migu_video/blob/main/cctv.migu.m3u">ioptu/migu_video/cctv.migu.m3u</a> (共 ${{ steps.download.outputs.source2_lines }} 行，已自动添加 group-title="央视专版")</p>
+            <p><strong>🔗 源文件1（migu.m3u）：</strong> <a href="https://github.com/ioptu/migu-video/blob/main/migu.m3u">ioptu/migu-video/migu.m3u</a> (共 ${{ steps.download.outputs.source1_lines }} 行)</p>
+            <p><strong>🔗 源文件2（cctv.migu.m3u）：</strong> <a href="https://github.com/ioptu/migu-video/blob/main/cctv.migu.m3u">ioptu/migu-video/cctv.migu.m3u</a> (共 ${{ steps.download.outputs.source2_lines }} 行，已自动添加 group-title="央视专版")</p>
             <p><strong>📂 你的文件：</strong> <a href="https://github.com/jia070310/lemonTV/blob/main/iptv-fe.m3u">jia070310/lemonTV/iptv-fe.m3u</a></p>
           </div>
           <div style="background-color: #f9f9f9; padding: 15px; margin-top: 15px;">

@@ -13,6 +13,7 @@ import top.yogiczy.mytv.data.repositories.FileCacheRepository
 import top.yogiczy.mytv.data.repositories.iptv.parser.IptvParser
 import top.yogiczy.mytv.data.repositories.iptv.parser.M3uIptvParser
 import top.yogiczy.mytv.data.utils.Constants
+import top.yogiczy.mytv.ui.utils.SP
 import top.yogiczy.mytv.utils.Logger
 
 /**
@@ -35,21 +36,56 @@ class IptvRepository : FileCacheRepository("iptv.txt") {
      * 获取远程直播源数据
      * @param forceRefresh 是否强制刷新（绕过 HTTP 缓存）
      */
-    private suspend fun fetchSource(sourceUrl: String, forceRefresh: Boolean = false) = withContext(Dispatchers.IO) {
-        log.d("获取远程直播源: $sourceUrl, 强制刷新: $forceRefresh")
+    private suspend fun fetchSource(sourceUrl: String, forceRefresh: Boolean = false) =
+        withContext(Dispatchers.IO) {
+            val candidates = Constants.iptvSourceFallbackUrls(sourceUrl, SP.githubProxy)
+            log.d("获取远程直播源: $sourceUrl, 候选=${candidates.size}, 强制刷新: $forceRefresh")
 
-        // 创建禁用缓存的 OkHttpClient
-        val client = if (forceRefresh) {
-            OkHttpClient.Builder()
-                .cache(null)  // 完全禁用缓存
-                .build()
-        } else {
-            OkHttpClient()
+            val client = if (forceRefresh) {
+                OkHttpClient.Builder()
+                    .cache(null)
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+            } else {
+                OkHttpClient.Builder()
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+            }
+
+            var lastError: Exception? = null
+            for (candidate in candidates) {
+                try {
+                    val content = downloadSource(client, candidate, forceRefresh)
+                    // 空壳 #EXTM3U（例如部分 jsDelivr 节点缓存失效）视为失败
+                    if (content.trim().length < 64) {
+                        throw Exception("直播源内容过短，可能镜像失效")
+                    }
+                    log.i("下载完成($candidate)，内容长度: ${content.length} 字符，行数: ${content.lines().size}")
+                    return@withContext content
+                } catch (ex: Exception) {
+                    lastError = ex
+                    log.w("候选源失败: $candidate -> ${ex.message}")
+                }
+            }
+
+            log.e("获取远程直播源失败", lastError)
+            val hint = if (candidates.any { Constants.usesGithubProxy(it, SP.githubProxy) }) {
+                "获取远程直播源失败，加速器可能不可用，请在后台设置修改加速器"
+            } else {
+                "获取远程直播源失败，请检查网络连接"
+            }
+            throw Exception(hint, lastError)
         }
-        
+
+    private fun downloadSource(
+        client: OkHttpClient,
+        sourceUrl: String,
+        forceRefresh: Boolean,
+    ): String {
         val requestBuilder = Request.Builder().url(sourceUrl)
 
-        // 针对 aptv.app 域名使用专用 UA（避免被反爬/鉴权拦截）
         val host = try {
             Uri.parse(sourceUrl).host ?: ""
         } catch (_: Exception) {
@@ -60,33 +96,24 @@ class IptvRepository : FileCacheRepository("iptv.txt") {
                 .header("User-Agent", Constants.VIDEO_PLAYER_USER_AGENT_APTV)
                 .header("X-App-Name", Constants.VIDEO_PLAYER_USER_AGENT_APTV)
         }
-        
-        // 强制刷新时，额外添加 HTTP 头绕过缓存
+
         if (forceRefresh) {
             requestBuilder
-                .cacheControl(okhttp3.CacheControl.Builder()
-                    .noCache()  // 不使用缓存
-                    .noStore()  // 不存储缓存
-                    .build())
-                .addHeader("Pragma", "no-cache")  // HTTP/1.0 兼容
-                .addHeader("Cache-Control", "no-cache, no-store, must-revalidate")  // 额外确保
+                .cacheControl(
+                    okhttp3.CacheControl.Builder()
+                        .noCache()
+                        .noStore()
+                        .build()
+                )
+                .addHeader("Pragma", "no-cache")
+                .addHeader("Cache-Control", "no-cache, no-store, must-revalidate")
         }
-        
-        val request = requestBuilder.build()
 
-        try {
-            with(client.newCall(request).execute()) {
-                if (!isSuccessful) {
-                    throw Exception("获取远程直播源失败: $code")
-                }
-
-                val content = body!!.string()
-                log.i("下载完成，内容长度: ${content.length} 字符，行数: ${content.lines().size}")
-                return@with content
+        client.newCall(requestBuilder.build()).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw Exception("获取远程直播源失败: ${response.code}")
             }
-        } catch (ex: Exception) {
-            log.e("获取远程直播源失败", ex)
-            throw Exception("获取远程直播源失败，请检查网络连接", ex)
+            return response.body?.string().orEmpty()
         }
     }
 

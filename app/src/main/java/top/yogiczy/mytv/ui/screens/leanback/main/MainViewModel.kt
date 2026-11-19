@@ -22,6 +22,7 @@ import top.yogiczy.mytv.data.repositories.epg.EpgRepository
 import top.yogiczy.mytv.data.repositories.iptv.IptvRepository
 import top.yogiczy.mytv.data.utils.Constants
 import top.yogiczy.mytv.ui.screens.leanback.toast.LeanbackToastState
+import top.yogiczy.mytv.ui.utils.HttpServer
 import top.yogiczy.mytv.ui.utils.SP
 import top.yogiczy.mytv.utils.Logger
 
@@ -147,7 +148,16 @@ class LeanbackMainViewModel : ViewModel() {
             }
             .catch { ex ->
                 log.e("获取直播源失败", ex)
-                _uiState.value = LeanbackMainUiState.Error(ex.message)
+                val baseMessage = ex.message ?: "获取远程直播源失败"
+                val message = if (baseMessage.contains("加速器")) {
+                    "$baseMessage：${HttpServer.serverUrl}"
+                } else {
+                    baseMessage
+                }
+                _uiState.value = LeanbackMainUiState.Error(message)
+                if (baseMessage.contains("加速器")) {
+                    LeanbackToastState.I.showToast(message)
+                }
                 SP.iptvSourceUrlHistoryList -= SP.iptvSourceUrl
                 // 捕获异常后不再继续执行，直接返回
             }

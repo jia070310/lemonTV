@@ -127,8 +127,8 @@ fun LeanbackSettingsCategoryIptv(
 
             LeanbackSettingsCategoryListItem(
                 headlineContent = "自定义直播源",
-                supportingContent = if (settingsViewModel.iptvSourceUrl != Constants.IPTV_SOURCE_URL) settingsViewModel.iptvSourceUrl else null,
-                trailingContent = if (settingsViewModel.iptvSourceUrl != Constants.IPTV_SOURCE_URL) "已启用" else "未启用",
+                supportingContent = if (settingsViewModel.iptvSourceUrl != SP.defaultIptvSourceUrl) settingsViewModel.iptvSourceUrl else null,
+                trailingContent = if (settingsViewModel.iptvSourceUrl != SP.defaultIptvSourceUrl) "已启用" else "未启用",
                 onSelected = { 
                     // 打开对话框前，刷新历史记录列表（从 SP 重新读取）
                     settingsViewModel.iptvSourceUrlHistoryList = SP.iptvSourceUrlHistoryList
@@ -186,7 +186,7 @@ private fun LeanbackSettingsIptvSourceHistoryDialog(
     showDialogProvider: () -> Boolean = { false },
     onDismissRequest: () -> Unit = {},
     iptvSourceHistoryProvider: () -> ImmutableList<String> = { persistentListOf() },
-    currentIptvSourceProvider: () -> String = { Constants.IPTV_SOURCE_URL },
+    currentIptvSourceProvider: () -> String = { SP.defaultIptvSourceUrl },
     onSelected: (String) -> Unit = {},
     onDeleted: (String) -> Unit = {},
 ) {
@@ -295,7 +295,7 @@ private fun LeanbackSettingsIptvSourceHistoryDialog(
                             headlineContent = {
                                 androidx.tv.material3.Text(
                                     text = nameMap[source] ?: when {
-                                        source == Constants.IPTV_SOURCE_URL -> "默认源"
+                                        source == SP.defaultIptvSourceUrl -> "默认源"
                                         source.contains("migu.m3u") -> "咪咕源"
                                         source.contains("aptv.app") -> "APTV"
                                         source.contains("httop.m3u") && !source.contains("merged") -> "HTTOP源"
@@ -308,7 +308,7 @@ private fun LeanbackSettingsIptvSourceHistoryDialog(
                                     maxLines = if (isFocused) Int.MAX_VALUE else 2,
                                 )
                             },
-                            supportingContent = if (isFocused || nameMap.containsKey(source) || source in Constants.IPTV_SOURCE_DEFAULT_LIST) {
+                            supportingContent = if (isFocused || nameMap.containsKey(source) || source in SP.getIptvSourceList()) {
                                 {
                                     androidx.tv.material3.Text(
                                         text = source,

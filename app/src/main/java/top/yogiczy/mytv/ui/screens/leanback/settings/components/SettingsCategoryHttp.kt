@@ -25,6 +25,16 @@ fun LeanbackSettingsCategoryHttp(
     ) {
         item {
             LeanbackSettingsCategoryListItem(
+                headlineContent = "GitHub 加速器",
+                supportingContent = SP.githubProxy,
+                trailingContent = "后台可改",
+                locK = true,
+                remoteConfig = true,
+            )
+        }
+
+        item {
+            LeanbackSettingsCategoryListItem(
                 headlineContent = "HTTP请求重试次数",
                 supportingContent = "影响直播源、节目单数据获取",
                 trailingContent = Constants.HTTP_RETRY_COUNT.toString(),

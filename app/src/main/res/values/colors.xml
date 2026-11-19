@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="mytv_background">#1A1C1E</color>
-    <!-- 启动画面背景色 -->
+    <!-- 启动/加载画面背景色（柠檬黄主题） -->
     <color name="splash_background_color">#FDDD0E</color>
 </resources>

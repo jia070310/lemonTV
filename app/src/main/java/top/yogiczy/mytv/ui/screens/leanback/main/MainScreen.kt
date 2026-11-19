@@ -118,11 +118,11 @@ private fun LeanbackMainScreenLoadingInitial(messageProvider: () -> String?) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(androidx.compose.ui.graphics.Color(0xFFFDDD0E)) // 黄色背景
+            .background(Color(0xFFFDDD0E)) // 与启动画面同色（柠檬黄）
     ) {
-        // 图标居中显示（与第一个启动画面位置完全一致）
+        // 透明底图标居中（与启动画面一致）
         Image(
-            painter = androidx.compose.ui.res.painterResource(id = top.yogiczy.mytv.R.mipmap.ic_launcher),
+            painter = androidx.compose.ui.res.painterResource(id = top.yogiczy.mytv.R.drawable.ic_splash_logo),
             contentDescription = null,
             modifier = Modifier.align(Alignment.Center)
         )
@@ -131,13 +131,13 @@ private fun LeanbackMainScreenLoadingInitial(messageProvider: () -> String?) {
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 120.dp),  // 从底部往上120dp
+                .padding(bottom = 120.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = "加载中...",
                 style = MaterialTheme.typography.headlineSmall,
-                color = androidx.compose.ui.graphics.Color.Black
+                color = Color.Black
             )
 
             val message = messageProvider()
@@ -145,7 +145,7 @@ private fun LeanbackMainScreenLoadingInitial(messageProvider: () -> String?) {
                 Text(
                     text = message,
                     style = MaterialTheme.typography.bodySmall,
-                    color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f),
+                    color = Color.Black.copy(alpha = 0.6f),
                     modifier = Modifier
                         .padding(top = 8.dp)
                         .sizeIn(maxWidth = 500.dp),
@@ -169,6 +169,11 @@ private fun LeanbackMainScreenError(
     serverUrl: String = HttpServer.serverUrl,
 ) {
     val childPadding = rememberLeanbackChildPadding()
+
+    // 错误页展示后台二维码时再开启服务
+    LaunchedEffect(Unit) {
+        HttpServer.startIfNeeded()
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -221,9 +226,15 @@ private fun LeanbackMainScreenError(
                 )
                 
                 Text(
-                    text = "2️⃣ 或扫描右下角二维码，通过网页推送新的直播源",
+                    text = "2️⃣ 扫描右下角二维码打开后台，修改「GitHub 加速器」或推送新直播源",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+                )
+                
+                Text(
+                    text = "后台地址：$serverUrl",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                 )
             }
         }

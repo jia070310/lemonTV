@@ -9,6 +9,8 @@ import top.yogiczy.mytv.data.repositories.git.GitRepository
 import top.yogiczy.mytv.data.utils.Constants
 import top.yogiczy.mytv.ui.screens.leanback.toast.LeanbackToastProperty
 import top.yogiczy.mytv.ui.screens.leanback.toast.LeanbackToastState
+import top.yogiczy.mytv.ui.utils.HttpServer
+import top.yogiczy.mytv.ui.utils.SP
 import top.yogiczy.mytv.utils.Downloader
 import top.yogiczy.mytv.utils.Logger
 import top.yogiczy.mytv.utils.compareVersion
@@ -74,7 +76,12 @@ class LeanBackUpdateViewModel : ViewModel() {
             }
         } catch (ex: Exception) {
             log.e("下载更新失败", ex)
-            LeanbackToastState.I.showToast("下载更新失败: ${ex.message}")
+            val msg = if (Constants.usesGithubProxy(_latestRelease.downloadUrl, SP.githubProxy)) {
+                "下载更新失败，加速器可能不可用，请在后台设置修改加速器：${HttpServer.serverUrl}"
+            } else {
+                "下载更新失败: ${ex.message}"
+            }
+            LeanbackToastState.I.showToast(msg)
         } finally {
             _isUpdating = false
         }

@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android" android:opacity="opaque">
-    <!-- 背景色 #fddd0e -->
+    <!-- 纯色背景；图标为透明底，避免方块边界 -->
     <item android:drawable="@color/splash_background_color"/>
-    
-    <!-- 居中显示的图标 -->
+
+    <!-- 居中显示的透明图标 -->
     <item>
         <bitmap
-            android:src="@mipmap/ic_launcher"
+            android:src="@drawable/ic_splash_logo"
             android:gravity="center"/>
     </item>
 </layer-list>

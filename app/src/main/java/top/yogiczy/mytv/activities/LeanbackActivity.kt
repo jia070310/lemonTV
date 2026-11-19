@@ -68,8 +68,14 @@ class LeanbackActivity : ComponentActivity() {
             }
         }
 
-        HttpServer.start(applicationContext, showToast = {
+        // 仅注册回调；10481 端口在进入二维码/后台设置界面时才开启
+        HttpServer.init(applicationContext, showToast = {
             LeanbackToastState.I.showToast(it, id = "httpServer")
         })
+    }
+
+    override fun onDestroy() {
+        HttpServer.stop()
+        super.onDestroy()
     }
 }

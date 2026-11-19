@@ -4,6 +4,7 @@
   "iptvSourceUrl": "http://example.com/live.m3u",
   "epgXmlUrl": "http://example.com/epg.xml",
   "videoPlayerUserAgent": "Mozilla/5.0...",
+  "githubProxy": "https://ghproxy.net/",
   "appBootLaunch": true,
   "appDeviceDisplayType": 0,
   "debugShowFps": false,

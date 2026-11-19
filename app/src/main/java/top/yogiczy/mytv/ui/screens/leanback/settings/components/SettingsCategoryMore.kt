@@ -26,6 +26,11 @@ fun LeanbackSettingsCategoryMore(
     modifier: Modifier = Modifier,
     serverUrl: String = HttpServer.serverUrl,
 ) {
+    // 进入「更多」二维码设置页时才开启后台服务
+    LaunchedEffect(Unit) {
+        HttpServer.startIfNeeded()
+    }
+
     TvLazyColumn(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(10.dp),

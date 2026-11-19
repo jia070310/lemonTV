@@ -11,6 +11,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -22,6 +23,7 @@ import io.github.alexzhirkevich.qrose.options.QrShapes
 import io.github.alexzhirkevich.qrose.options.circle
 import io.github.alexzhirkevich.qrose.options.roundCorners
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
+import top.yogiczy.mytv.ui.utils.HttpServer
 
 @Composable
 fun LeanbackQrcode(
@@ -62,6 +64,12 @@ fun LeanbackQrcodeDialog(
     onDismissRequest: () -> Unit = {},
 ) {
     if (showDialogProvider()) {
+        // 后台设置二维码出现时才开启本地 HTTP 服务
+        LaunchedEffect(text) {
+            if (HttpServer.isLocalSettingsUrl(text)) {
+                HttpServer.startIfNeeded()
+            }
+        }
         AlertDialog(
             modifier = modifier,
             properties = DialogProperties(usePlatformDefaultWidth = false),

@@ -596,6 +596,15 @@
                             
                             <button 
                                 class="nav-item" 
+                                :class="{ active: activeSection === 'proxy' }"
+                                @click="switchSection('proxy')"
+                            >
+                                <span class="iconify nav-icon" data-icon="material-symbols:speed-outline"></span>
+                                <span>GitHub 加速器</span>
+                            </button>
+                            
+                            <button 
+                                class="nav-item" 
                                 :class="{ active: activeSection === 'debug' }"
                                 @click="switchSection('debug')"
                             >
@@ -778,6 +787,40 @@
                                         >
                                             <span class="iconify" data-icon="material-symbols:save-rounded"></span>
                                             <span>保存播放器配置</span>
+                                        </button>
+                                    </div>
+                                </section>
+
+                                <!-- GitHub 加速器 -->
+                                <section class="section-container" :class="{ active: activeSection === 'proxy' }">
+                                    <div class="section-header">
+                                        <div class="section-title">
+                                            <h2>GitHub 加速器</h2>
+                                            <p>用于拉取 GitHub 直播源与更新包；失效时可在此更换可用加速地址</p>
+                                        </div>
+                                        <span class="section-tag">TYPE: PROXY</span>
+                                    </div>
+                                    
+                                    <div class="settings-card">
+                                        <div class="input-group">
+                                            <label class="input-label">加速器地址</label>
+                                            <input 
+                                                v-model="settings.githubProxy" 
+                                                type="text" 
+                                                class="input-field"
+                                                placeholder="例如：https://ghproxy.net/"
+                                            />
+                                        </div>
+                                        <p style="margin: -8px 0 16px; color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.5;">
+                                            默认：https://ghproxy.net/ 。留空保存将恢复默认。修改后会自动迁移已保存的加速源地址，并需重启应用生效。
+                                        </p>
+                                        
+                                        <button 
+                                            class="btn-primary" 
+                                            @click="confirmSettings()"
+                                        >
+                                            <span class="iconify" data-icon="material-symbols:save-rounded"></span>
+                                            <span>保存加速器配置</span>
                                         </button>
                                     </div>
                                 </section>

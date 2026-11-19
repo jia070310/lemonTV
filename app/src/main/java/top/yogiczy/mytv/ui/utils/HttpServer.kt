@@ -26,55 +26,102 @@ import java.net.NetworkInterface
 import java.net.SocketException
 
 object HttpServer : Loggable() {
-    private const val SERVER_PORT = 10481
+    const val SERVER_PORT = 10481
 
     private val uploadedApkFile = File(AppGlobal.cacheDir, "uploaded_apk.apk").apply {
         deleteOnExit()
     }
 
     private var showToast: (String) -> Unit = { }
+    private var appContext: Context? = null
+    private var server: AsyncHttpServer? = null
+    @Volatile
+    private var started = false
+    @Volatile
+    private var starting = false
 
-    val serverUrl: String by lazy {
-        "http://${getLocalIpAddress()}:${SERVER_PORT}"
+    val serverUrl: String
+        get() = "http://${getLocalIpAddress()}:${SERVER_PORT}"
+
+    /** 仅注册回调，不立刻开端口（进入二维码界面时再 startIfNeeded） */
+    fun init(context: Context, showToast: (String) -> Unit) {
+        appContext = context.applicationContext
+        this.showToast = showToast
     }
 
-    fun start(context: Context, showToast: (String) -> Unit) {
+    /** 进入后台二维码/设置页时按需启动；已启动则忽略 */
+    fun startIfNeeded() {
+        val context = appContext ?: return
+        synchronized(this) {
+            if (started || starting) return
+            starting = true
+        }
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val server = AsyncHttpServer()
-                server.listen(AsyncServer.getDefault(), SERVER_PORT)
+                val httpServer = AsyncHttpServer()
+                httpServer.listen(AsyncServer.getDefault(), SERVER_PORT)
 
-                server.get("/") { _, response ->
+                httpServer.get("/") { _, response ->
                     handleRawResource(response, context, "text/html", R.raw.index)
                 }
-                server.get("/index_css.css") { _, response ->
+                httpServer.get("/index_css.css") { _, response ->
                     handleRawResource(response, context, "text/css", R.raw.index_css)
                 }
-                server.get("/index_js.js") { _, response ->
+                httpServer.get("/index_js.js") { _, response ->
                     handleRawResource(response, context, "text/javascript", R.raw.index_js)
                 }
 
-                server.get("/api/settings") { _, response ->
+                httpServer.get("/api/settings") { _, response ->
                     handleGetSettings(response)
                 }
 
-                server.post("/api/settings") { request, response ->
+                httpServer.post("/api/settings") { request, response ->
                     handleSetSettings(request, response)
                 }
 
-                server.post("/api/upload/apk") { request, response ->
+                httpServer.post("/api/upload/apk") { request, response ->
                     handleUploadApk(request, response, context)
                 }
 
-                HttpServer.showToast = showToast
-                log.i("服务已启动: 0.0.0.0:${SERVER_PORT}")
+                synchronized(this@HttpServer) {
+                    server = httpServer
+                    started = true
+                    starting = false
+                }
+                log.i("设置服务已启动: 0.0.0.0:${SERVER_PORT}")
             } catch (ex: Exception) {
+                synchronized(this@HttpServer) {
+                    started = false
+                    starting = false
+                    server = null
+                }
                 log.e("服务启动失败: ${ex.message}", ex)
                 launch(Dispatchers.Main) {
                     Toast.makeText(context, "设置服务启动失败", Toast.LENGTH_SHORT).show()
                 }
             }
         }
+    }
+
+    /** 应用退出时关闭端口 */
+    fun stop() {
+        synchronized(this) {
+            try {
+                server?.stop()
+            } catch (ex: Exception) {
+                log.e("关闭设置服务失败: ${ex.message}", ex)
+            } finally {
+                server = null
+                started = false
+                starting = false
+            }
+        }
+        log.i("设置服务已关闭")
+    }
+
+    fun isLocalSettingsUrl(url: String): Boolean {
+        return url.contains(":${SERVER_PORT}")
     }
 
     private fun wrapResponse(response: AsyncHttpServerResponse) = response.apply {
@@ -112,6 +159,7 @@ object HttpServer : Loggable() {
                         epgXmlUrl = SP.epgXmlUrl,
                         epgXmlUrlName = SP.iptvSourceNameMap[SP.epgXmlUrl] ?: "",
                         videoPlayerUserAgent = SP.videoPlayerUserAgent,
+                        githubProxy = SP.githubProxy,
                         logHistory = Logger.history,
                     )
                 )
@@ -124,20 +172,35 @@ object HttpServer : Loggable() {
         response: AsyncHttpServerResponse,
     ) {
         val body = request.getBody<JSONObjectBody>().get()
-        val iptvSourceUrl = body.get("iptvSourceUrl").toString()
+        val iptvSourceUrl = body.optString("iptvSourceUrl", "")
         val iptvSourceName = body.optString("iptvSourceName", "")
-        val epgXmlUrl = body.get("epgXmlUrl").toString()
+        val epgXmlUrl = body.optString("epgXmlUrl", "")
         val epgXmlUrlName = body.optString("epgXmlUrlName", "")
-        val videoPlayerUserAgent = body.get("videoPlayerUserAgent").toString()
+        val videoPlayerUserAgent = body.optString("videoPlayerUserAgent", "")
+        val githubProxy = body.optString("githubProxy", "")
+
+        // 自定义 GitHub 加速器：保存后迁移已有源地址
+        if (body.has("githubProxy")) {
+            val normalized = Constants.normalizeGithubProxy(
+                githubProxy.ifBlank { Constants.GITHUB_PROXY }
+            )
+            if (normalized != SP.githubProxy) {
+                SP.rewriteGithubProxyUrls(normalized)
+                showToast("加速器已更新为 $normalized，请重启应用生效")
+            } else {
+                SP.githubProxy = normalized
+            }
+        }
 
         // 重要：网页推送只用于“新增/更新历史列表”，不改变当前已选中的直播源/节目单/UA。
         // 避免 UI 通过“当前值 == 列表项”计算 selected/勾选状态时自动选中新推送的数据。
         if (iptvSourceUrl.isNotBlank()) {
-            SP.iptvSourceUrlHistoryList = SP.iptvSourceUrlHistoryList + iptvSourceUrl
-            SP.iptvSourceDeletedList = SP.iptvSourceDeletedList - iptvSourceUrl
+            val migratedUrl = Constants.migrateGithubProxyUrl(iptvSourceUrl, SP.githubProxy)
+            SP.iptvSourceUrlHistoryList = SP.iptvSourceUrlHistoryList + migratedUrl
+            SP.iptvSourceDeletedList = SP.iptvSourceDeletedList - migratedUrl
             // 保存名称映射（同时用于节目单列表展示）
             if (iptvSourceName.isNotBlank()) {
-                SP.iptvSourceNameMap = SP.iptvSourceNameMap + (iptvSourceUrl to iptvSourceName)
+                SP.iptvSourceNameMap = SP.iptvSourceNameMap + (migratedUrl to iptvSourceName)
             }
         }
 
@@ -221,6 +284,7 @@ private data class AllSettings(
     val epgXmlUrl: String,
     val epgXmlUrlName: String,
     val videoPlayerUserAgent: String,
+    val githubProxy: String,
 
     val logHistory: List<Logger.HistoryItem>,
 )

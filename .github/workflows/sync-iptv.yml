@@ -2,137 +2,202 @@ name: Auto Sync IPTV with Email
 
 on:
   schedule:
+    # 轮询检测上游 migu.m3u 是否更新（真正整合只在有变化时执行）
     - cron: '*/15 * * * *'
   workflow_dispatch:
+    inputs:
+      force:
+        description: '强制重新整合（忽略上游哈希）'
+        required: false
+        default: 'false'
+        type: boolean
 
 jobs:
   sync-and-notify:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout your repo
       uses: actions/checkout@v5
       with:
         token: ${{ secrets.PAT_TOKEN }}
-    
-    - name: Check current file hash
-      id: hash_check
-      run: |
-        if [ -f "iptv-fe.m3u" ]; then
-          OLD_HASH=$(sha256sum iptv-fe.m3u | awk '{print $1}')
-          echo "old_hash=$OLD_HASH" >> $GITHUB_OUTPUT
-        else
-          echo "old_hash=none" >> $GITHUB_OUTPUT
-        fi
-    
-    # 下载 → 修正 cctv 文件格式 → 合并
-    - name: Download, fix and merge source files
-      id: download
+
+    - name: Detect upstream migu.m3u update
+      id: detect
       run: |
         set -euo pipefail
 
-        # 源仓库为 ioptu/migu-video（连字符），旧地址 migu_video 已 404
-        curl -fsSL -o migu.m3u "https://raw.githubusercontent.com/ioptu/migu-video/main/migu.m3u"
-        curl -fsSL -o cctv_raw.m3u "https://raw.githubusercontent.com/ioptu/migu-video/main/cctv.migu.m3u"
+        STATE_FILE=".github/migu-sync-state"
+        mkdir -p .github
 
-        # 下载失败时不要把 404 正文当播放列表提交
-        if ! head -1 migu.m3u | grep -q "^#EXTM3U"; then
-          echo "migu.m3u 无效（缺少 #EXTM3U）"
-          head -5 migu.m3u || true
+        echo "⬇️ 检测上游 migu.m3u ..."
+        curl -fsSL -o /tmp/upstream-migu.m3u \
+          "https://raw.githubusercontent.com/ioptu/migu-video/main/migu.m3u"
+
+        if ! head -1 /tmp/upstream-migu.m3u | grep -q "^#EXTM3U"; then
+          echo "上游 migu.m3u 无效（缺少 #EXTM3U）"
+          head -5 /tmp/upstream-migu.m3u || true
           exit 1
         fi
+
+        NEW_MIGU_HASH=$(sha256sum /tmp/upstream-migu.m3u | awk '{print $1}')
+        echo "upstream_migu_hash=$NEW_MIGU_HASH" >> "$GITHUB_OUTPUT"
+
+        OLD_MIGU_HASH="none"
+        if [ -f "$STATE_FILE" ]; then
+          # 格式: migu_sha256=<hash>
+          OLD_MIGU_HASH=$(grep -E '^migu_sha256=' "$STATE_FILE" | cut -d= -f2- || true)
+          OLD_MIGU_HASH=${OLD_MIGU_HASH:-none}
+        fi
+        echo "old_migu_hash=$OLD_MIGU_HASH" >> "$GITHUB_OUTPUT"
+
+        FORCE="${{ github.event.inputs.force || 'false' }}"
+        if [ "$FORCE" = "true" ]; then
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "reason=force" >> "$GITHUB_OUTPUT"
+          echo "🔧 手动强制整合"
+        elif [ "$OLD_MIGU_HASH" = "none" ]; then
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "reason=first_run" >> "$GITHUB_OUTPUT"
+          echo "🆕 首次同步，将执行整合"
+        elif [ "$OLD_MIGU_HASH" != "$NEW_MIGU_HASH" ]; then
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "reason=migu_updated" >> "$GITHUB_OUTPUT"
+          echo "✅ 检测到 migu.m3u 已更新"
+          echo "   旧: $OLD_MIGU_HASH"
+          echo "   新: $NEW_MIGU_HASH"
+        else
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+          echo "reason=unchanged" >> "$GITHUB_OUTPUT"
+          echo "⏭️ migu.m3u 未变化，跳过整合"
+        fi
+
+    - name: Download cctv.m3u, fix and merge
+      id: download
+      if: steps.detect.outputs.changed == 'true'
+      run: |
+        set -euo pipefail
+
+        # migu 已在检测步骤下载；再拉 cctv 并整合
+        cp /tmp/upstream-migu.m3u migu.m3u
+        curl -fsSL -o cctv_raw.m3u \
+          "https://raw.githubusercontent.com/ioptu/migu-video/main/cctv.migu.m3u"
+
         if [ ! -s cctv_raw.m3u ]; then
           echo "cctv.migu.m3u 为空"
           exit 1
         fi
-        
-        # 修正 cctv 文件：在每个 #EXTINF 行的 tvg-logo="..." 后面插入 ,group-title="央视专版",
-        # 原始格式：#EXTINF:-1 tvg-id="CCTV1" tvg-name="CCTV1" tvg-logo="..."CCTV1
-        # 目标格式：#EXTINF:-1 tvg-id="CCTV1" tvg-name="CCTV1" tvg-logo="...",group-title="央视专版",CCTV1
+
+        CCTV_HASH=$(sha256sum cctv_raw.m3u | awk '{print $1}')
+        echo "upstream_cctv_hash=$CCTV_HASH" >> "$GITHUB_OUTPUT"
+
+        # 修正 cctv：在 tvg-logo="..." 后插入 group-title="央视专版"
+        # 原始：#EXTINF:-1 tvg-id="CCTV1" ... tvg-logo="..."CCTV1
+        # 目标：#EXTINF:-1 ... tvg-logo="...",group-title="央视专版",CCTV1
         sed -i 's/\(tvg-logo="[^"]*"\)/\1,group-title="央视专版",/' cctv_raw.m3u
-        
-        # 合并两个文件（去除重复的 #EXTM3U 头部）
-        # 先写入 migu.m3u（保留其头部）
-        head -1 migu.m3u | grep -q "^#EXTM3U" && has_header1=true || has_header1=false
-        if [ "$has_header1" = true ]; then
+
+        # 合并：保留 migu 头部，追加修正后的 cctv（去掉重复 #EXTM3U）
+        if head -1 migu.m3u | grep -q "^#EXTM3U"; then
           cat migu.m3u > new-iptv.m3u
         else
           echo "#EXTM3U" > new-iptv.m3u
           cat migu.m3u >> new-iptv.m3u
         fi
-        
-        # 追加修正后的 cctv 内容（去掉可能的 #EXTM3U 行）
-        head -1 cctv_raw.m3u | grep -q "^#EXTM3U" && has_header2=true || has_header2=false
-        if [ "$has_header2" = true ]; then
+
+        if head -1 cctv_raw.m3u | grep -q "^#EXTM3U"; then
           tail -n +2 cctv_raw.m3u >> new-iptv.m3u
         else
           cat cctv_raw.m3u >> new-iptv.m3u
         fi
-        
-        # 计算哈希和统计信息
+
         NEW_HASH=$(sha256sum new-iptv.m3u | awk '{print $1}')
-        echo "new_hash=$NEW_HASH" >> $GITHUB_OUTPUT
-        FILESIZE=$(stat -f%z new-iptv.m3u 2>/dev/null || stat -c%s new-iptv.m3u)
+        echo "new_hash=$NEW_HASH" >> "$GITHUB_OUTPUT"
+
+        FILESIZE=$(stat -c%s new-iptv.m3u)
         LINES=$(wc -l < new-iptv.m3u)
         echo "合并后文件大小: ${FILESIZE}字节, ${LINES}行"
-        
-        # 源文件行数（供邮件使用）
+
         LINES1=$(wc -l < migu.m3u)
         LINES2=$(wc -l < cctv_raw.m3u)
-        echo "source1_lines=$LINES1" >> $GITHUB_OUTPUT
-        echo "source2_lines=$LINES2" >> $GITHUB_OUTPUT
-    
-    - name: Compare files
-      id: compare
-      run: |
-        if [ "${{ steps.hash_check.outputs.old_hash }}" == "${{ steps.download.outputs.new_hash }}" ]; then
-          echo "changed=false" >> $GITHUB_OUTPUT
+        echo "source1_lines=$LINES1" >> "$GITHUB_OUTPUT"
+        echo "source2_lines=$LINES2" >> "$GITHUB_OUTPUT"
+
+        # 旧产物哈希（用于邮件对比）
+        if [ -f "iptv-fe.m3u" ]; then
+          OLD_OUT=$(sha256sum iptv-fe.m3u | awk '{print $1}')
         else
-          echo "changed=true" >> $GITHUB_OUTPUT
+          OLD_OUT=none
         fi
-    
-    - name: Update and push
-      if: steps.compare.outputs.changed == 'true'
+        echo "old_output_hash=$OLD_OUT" >> "$GITHUB_OUTPUT"
+
+    - name: Update state, commit and push
+      id: push
+      if: steps.detect.outputs.changed == 'true'
       run: |
+        set -euo pipefail
+
         mv new-iptv.m3u iptv-fe.m3u
+
+        mkdir -p .github
+        cat > .github/migu-sync-state <<EOF
+        migu_sha256=${{ steps.detect.outputs.upstream_migu_hash }}
+        cctv_sha256=${{ steps.download.outputs.upstream_cctv_hash }}
+        output_sha256=${{ steps.download.outputs.new_hash }}
+        updated_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+        reason=${{ steps.detect.outputs.reason }}
+        EOF
+
         git config --global user.name "GitHub Actions Bot"
         git config --global user.email "actions@github.com"
-        git add iptv-fe.m3u
-        git commit -m "🔄 自动同步IPTV: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-        
-        源文件1: migu.m3u (无修改)
-        源文件2: cctv.migu.m3u (已自动添加 group-title=\"央视专版\")
+        git add iptv-fe.m3u .github/migu-sync-state
+
+        if git diff --cached --quiet; then
+          echo "pushed=false" >> "$GITHUB_OUTPUT"
+          echo "ℹ️ 整合结果与仓库一致，无需提交"
+        else
+          git commit -m "🔄 检测到 migu.m3u 更新，自动整合 IPTV: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+        触发原因: ${{ steps.detect.outputs.reason }}
+        源文件1: migu.m3u
+        源文件2: cctv.migu.m3u (已添加 group-title=\"央视专版\")
+        migu哈希: ${{ steps.detect.outputs.upstream_migu_hash }}
         合并后哈希: ${{ steps.download.outputs.new_hash }}"
-        git push origin main
-    
+          git push origin HEAD
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Send email notification
-      if: steps.compare.outputs.changed == 'true'
+      if: steps.detect.outputs.changed == 'true' && steps.push.outputs.pushed == 'true'
       uses: dawidd6/action-send-mail@v16
       with:
         server_address: smtp.gmail.com
         server_port: 465
         username: ${{ secrets.EMAIL_USER }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "✅ IPTV文件已自动更新 - $(date -u '+%Y-%m-%d %H:%M') UTC"
+        subject: "✅ IPTV已按 migu.m3u 更新整合 - $(date -u '+%Y-%m-%d %H:%M') UTC"
         to: ${{ secrets.NOTIFY_EMAIL }}
         from: GitHub Actions <actions@github.com>
         html_body: |
-          <h2>📡 IPTV文件自动同步完成</h2>
+          <h2>📡 检测到 migu.m3u 更新并完成整合</h2>
           <div style="background-color: #f0f8ff; padding: 15px; border-radius: 5px;">
             <p><strong>🔄 同步状态：</strong> <span style="color: green;">✅ 成功更新</span></p>
+            <p><strong>📌 触发原因：</strong> ${{ steps.detect.outputs.reason }}</p>
             <p><strong>📅 更新时间：</strong> $(date -u '+%Y-%m-%d %H:%M:%S UTC')</p>
             <p><strong>🔗 源文件1（migu.m3u）：</strong> <a href="https://github.com/ioptu/migu-video/blob/main/migu.m3u">ioptu/migu-video/migu.m3u</a> (共 ${{ steps.download.outputs.source1_lines }} 行)</p>
             <p><strong>🔗 源文件2（cctv.migu.m3u）：</strong> <a href="https://github.com/ioptu/migu-video/blob/main/cctv.migu.m3u">ioptu/migu-video/cctv.migu.m3u</a> (共 ${{ steps.download.outputs.source2_lines }} 行，已自动添加 group-title="央视专版")</p>
             <p><strong>📂 你的文件：</strong> <a href="https://github.com/jia070310/lemonTV/blob/main/iptv-fe.m3u">jia070310/lemonTV/iptv-fe.m3u</a></p>
           </div>
           <div style="background-color: #f9f9f9; padding: 15px; margin-top: 15px;">
-            <h3>📊 文件信息</h3>
-            <p><strong>新哈希：</strong> <code>${{ steps.download.outputs.new_hash }}</code></p>
-            <p><strong>旧哈希：</strong> <code>${{ steps.hash_check.outputs.old_hash }}</code></p>
+            <h3>📊 哈希信息</h3>
+            <p><strong>上游 migu 新哈希：</strong> <code>${{ steps.detect.outputs.upstream_migu_hash }}</code></p>
+            <p><strong>上游 migu 旧哈希：</strong> <code>${{ steps.detect.outputs.old_migu_hash }}</code></p>
+            <p><strong>整合产物新哈希：</strong> <code>${{ steps.download.outputs.new_hash }}</code></p>
+            <p><strong>整合产物旧哈希：</strong> <code>${{ steps.download.outputs.old_output_hash }}</code></p>
           </div>
           <p><small>此邮件由 GitHub Actions 自动发送</small></p>
-    
-    - name: Log no changes
-      if: steps.compare.outputs.changed == 'false'
+
+    - name: Log no upstream changes
+      if: steps.detect.outputs.changed == 'false'
       run: |
-        echo "⏭️ $(date -u '+%Y-%m-%d %H:%M:%S UTC') - 文件未变化，跳过更新"
+        echo "⏭️ $(date -u '+%Y-%m-%d %H:%M:%S UTC') - 上游 migu.m3u 未变化，跳过整合"
+        echo "当前哈希: ${{ steps.detect.outputs.upstream_migu_hash }}"

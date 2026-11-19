@@ -7,7 +7,7 @@ object Constants {
     /**
      * 应用 标题
      */
-    const val APP_TITLE = "柠檬TV"
+    const val APP_TITLE = "柠檬直播"
 
     /**
      * 应用 代码仓库
@@ -15,18 +15,128 @@ object Constants {
     const val APP_REPO = "https://github.com/jia070310/lemonTV"
 
     /**
-     * IPTV源地址（默认直播源）
+     * IPTV源地址（默认直播源，走默认 GitHub 加速器）
      */
-    const val IPTV_SOURCE_URL =
-        "https://gh-proxy.org/https://github.com/jia070310/lemonTV/blob/main/iptv-fe.m3u"
-    
+    val IPTV_SOURCE_URL: String
+        get() = withGithubProxy(
+            "https://raw.githubusercontent.com/jia070310/lemonTV/main/iptv-fe.m3u",
+            GITHUB_PROXY,
+        )
+
     /**
-     * 默认IPTV源列表（用于快速切换）
+     * 默认IPTV源列表（用于快速切换；含加速器地址的项会随自定义加速器迁移）
      */
-    val IPTV_SOURCE_DEFAULT_LIST = listOf(
-        IPTV_SOURCE_URL,
-        "https://gh-proxy.org/github.com/ioptu/migu_video/raw/refs/heads/main/migu.m3u",
+    val IPTV_SOURCE_DEFAULT_LIST: List<String>
+        get() = listOf(
+            IPTV_SOURCE_URL,
+            withGithubProxy(
+                "https://raw.githubusercontent.com/ioptu/migu-video/main/migu.m3u",
+                GITHUB_PROXY,
+            ),
+            "https://fastly.jsdelivr.net/gh/jia070310/lemonTV@main/iptv-fe.m3u",
+            "https://fastly.jsdelivr.net/gh/ioptu/migu-video@main/migu.m3u",
+        )
+
+    /**
+     * 已知的 GitHub 加速域前缀（含历史失效域），用于统一迁移到当前加速器
+     */
+    val KNOWN_GITHUB_PROXY_PREFIXES = listOf(
+        "https://ghproxy.net/",
+        "http://ghproxy.net/",
+        "https://gh-proxy.org/",
+        "http://gh-proxy.org/",
+        "https://hk.gh-proxy.org/",
+        "http://hk.gh-proxy.org/",
+        "https://mirror.ghproxy.com/",
+        "http://mirror.ghproxy.com/",
+        "https://ghproxy.com/",
+        "http://ghproxy.com/",
+        "https://gh.ddlc.top/",
+        "https://gitclone.com/",
     )
+
+    /**
+     * 规范化加速器地址（保证以 http(s) 开头并以 / 结尾）
+     */
+    fun normalizeGithubProxy(proxy: String): String {
+        var out = proxy.trim()
+        if (out.isBlank()) return GITHUB_PROXY
+        if (!out.startsWith("http://") && !out.startsWith("https://")) {
+            out = "https://$out"
+        }
+        if (!out.endsWith("/")) out += "/"
+        return out
+    }
+
+    /**
+     * 将 URL 中的旧/其它 GitHub 加速域替换为指定加速器
+     * @param previousProxy 额外替换的上一次自定义加速器前缀
+     */
+    fun migrateGithubProxyUrl(
+        url: String,
+        proxy: String = GITHUB_PROXY,
+        previousProxy: String? = null,
+    ): String {
+        val target = normalizeGithubProxy(proxy)
+        var out = url.trim()
+        val replaceList = buildList {
+            addAll(KNOWN_GITHUB_PROXY_PREFIXES)
+            if (!previousProxy.isNullOrBlank()) add(normalizeGithubProxy(previousProxy))
+        }.distinctBy { it.lowercase() }
+        for (old in replaceList) {
+            if (old.equals(target, ignoreCase = true)) continue
+            out = out.replace(old, target, ignoreCase = true)
+        }
+        return out
+    }
+
+    /**
+     * 给 GitHub 原始地址加上加速器前缀（已带加速器则迁移到指定加速器）
+     */
+    fun withGithubProxy(rawUrl: String, proxy: String = GITHUB_PROXY): String {
+        val target = normalizeGithubProxy(proxy)
+        val trimmed = rawUrl.trim()
+        if (trimmed.isBlank()) return trimmed
+        if (KNOWN_GITHUB_PROXY_PREFIXES.any { trimmed.startsWith(it, ignoreCase = true) }
+            || trimmed.startsWith(target, ignoreCase = true)
+        ) {
+            return migrateGithubProxyUrl(trimmed, target)
+        }
+        return target + trimmed.removePrefix("/")
+    }
+
+    /**
+     * 判断 URL 是否走了 GitHub 加速器
+     */
+    fun usesGithubProxy(url: String, proxy: String = GITHUB_PROXY): Boolean {
+        val target = normalizeGithubProxy(proxy)
+        if (url.startsWith(target, ignoreCase = true)) return true
+        return KNOWN_GITHUB_PROXY_PREFIXES.any { url.startsWith(it, ignoreCase = true) }
+    }
+
+    /**
+     * 同一直播源的备用拉取地址（按优先级）
+     */
+    fun iptvSourceFallbackUrls(sourceUrl: String, proxy: String = GITHUB_PROXY): List<String> {
+        val u = migrateGithubProxyUrl(sourceUrl, proxy)
+        return when {
+            u.contains("jia070310/lemonTV") && u.contains("iptv-fe.m3u") -> listOf(
+                withGithubProxy(
+                    "https://raw.githubusercontent.com/jia070310/lemonTV/main/iptv-fe.m3u",
+                    proxy,
+                ),
+                "https://fastly.jsdelivr.net/gh/jia070310/lemonTV@main/iptv-fe.m3u",
+            )
+            u.contains("ioptu/migu-video") || u.contains("/migu.m3u") -> listOf(
+                withGithubProxy(
+                    "https://raw.githubusercontent.com/ioptu/migu-video/main/migu.m3u",
+                    proxy,
+                ),
+                "https://fastly.jsdelivr.net/gh/ioptu/migu-video@main/migu.m3u",
+            )
+            else -> emptyList()
+        }.let { fallbacks -> (listOf(u) + fallbacks).distinct() }
+    }
 
     /**
      * IPTV源缓存时间（毫秒）
@@ -55,9 +165,9 @@ object Constants {
         "https://api.github.com/repos/jia070310/lemonTV/releases/latest"
 
     /**
-     * GitHub加速代理地址
+     * GitHub 加速代理地址（默认可用值；可在后台设置中自定义）
      */
-    const val GITHUB_PROXY = "https://hk.gh-proxy.org/"
+    const val GITHUB_PROXY = "https://ghproxy.net/"
 
     /**
      * HTTP请求重试次数

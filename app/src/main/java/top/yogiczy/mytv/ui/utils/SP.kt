@@ -69,6 +69,9 @@ object SP {
         /** 直播源默认源 */
         IPTV_SOURCE_DEFAULT_URL,
 
+        /** GitHub 加速器地址 */
+        GITHUB_PROXY,
+
         /** 是否启用数字选台 */
         IPTV_CHANNEL_NO_SELECT_ENABLE,
 
@@ -174,11 +177,45 @@ object SP {
         get() = sp.getBoolean(KEY.IPTV_SOURCE_SIMPLIFY.name, false)
         set(value) = sp.edit().putBoolean(KEY.IPTV_SOURCE_SIMPLIFY.name, value).apply()
 
+    /** GitHub 加速器地址（默认 Constants.GITHUB_PROXY） */
+    var githubProxy: String
+        get() {
+            val raw = sp.getString(KEY.GITHUB_PROXY.name, null)
+            return Constants.normalizeGithubProxy(raw ?: Constants.GITHUB_PROXY)
+        }
+        set(value) = sp.edit()
+            .putString(KEY.GITHUB_PROXY.name, Constants.normalizeGithubProxy(value))
+            .apply()
+
+    /** 当前加速器下的默认直播源地址 */
+    val defaultIptvSourceUrl: String
+        get() = Constants.withGithubProxy(
+            "https://raw.githubusercontent.com/jia070310/lemonTV/main/iptv-fe.m3u",
+            githubProxy,
+        )
+
     /** 直播源 url */
     var iptvSourceUrl: String
-        get() = (sp.getString(KEY.IPTV_SOURCE_URL.name, "")
-            ?: "").ifBlank { Constants.IPTV_SOURCE_URL }
-        set(value) = sp.edit().putString(KEY.IPTV_SOURCE_URL.name, value).apply()
+        get() {
+            val raw = (sp.getString(KEY.IPTV_SOURCE_URL.name, "") ?: "").ifBlank {
+                Constants.withGithubProxy(
+                    "https://raw.githubusercontent.com/jia070310/lemonTV/main/iptv-fe.m3u",
+                    githubProxy,
+                )
+            }
+            val migrated = Constants.migrateGithubProxyUrl(raw, githubProxy)
+            if (migrated != raw) {
+                // 自动纠正旧安装里保存的失效加速域，避免反复重试 10 次
+                sp.edit().putString(KEY.IPTV_SOURCE_URL.name, migrated).apply()
+            }
+            return migrated
+        }
+        set(value) = sp.edit()
+            .putString(
+                KEY.IPTV_SOURCE_URL.name,
+                Constants.migrateGithubProxyUrl(value, githubProxy),
+            )
+            .apply()
 
     /** 直播源缓存时间（毫秒） */
     var iptvSourceCacheTime: Long
@@ -200,11 +237,37 @@ object SP {
         get() = sp.getStringSet(KEY.IPTV_SOURCE_DELETED_LIST.name, emptySet()) ?: emptySet()
         set(value) = sp.edit().putStringSet(KEY.IPTV_SOURCE_DELETED_LIST.name, value).apply()
 
-    /** 获取所有可用的直播源列表（默认源 + 历史源，排除已删除） */
+    /** 获取所有可用的直播源列表（默认源 + 历史源，排除已删除；加速器地址按当前配置迁移） */
     fun getIptvSourceList(): List<String> =
         (Constants.IPTV_SOURCE_DEFAULT_LIST + iptvSourceUrlHistoryList)
+            .map { Constants.migrateGithubProxyUrl(it, githubProxy) }
             .distinct()
             .filter { it !in iptvSourceDeletedList }
+
+    /**
+     * 切换加速器后，把已保存的直播源地址一并迁移到新加速器
+     */
+    fun rewriteGithubProxyUrls(newProxy: String) {
+        val previous = githubProxy
+        val target = Constants.normalizeGithubProxy(newProxy)
+        fun migrate(url: String) =
+            Constants.migrateGithubProxyUrl(url, target, previousProxy = previous)
+
+        githubProxy = target
+        // 直接写 SP，避免 getter/setter 再套一层迁移逻辑
+        sp.edit()
+            .putString(KEY.IPTV_SOURCE_URL.name, migrate(iptvSourceUrl))
+            .putString(KEY.IPTV_SOURCE_DEFAULT_URL.name, migrate(iptvSourceDefaultUrl))
+            .putStringSet(
+                KEY.IPTV_SOURCE_URL_HISTORY_LIST.name,
+                iptvSourceUrlHistoryList.map(::migrate).toSet(),
+            )
+            .putStringSet(
+                KEY.IPTV_SOURCE_DELETED_LIST.name,
+                iptvSourceDeletedList.map(::migrate).toSet(),
+            )
+            .apply()
+    }
 
     /** 直播源名称映射 */
     var iptvSourceNameMap: Map<String, String>
@@ -233,7 +296,7 @@ object SP {
     /** 直播源默认源 */
     var iptvSourceDefaultUrl: String
         get() = (sp.getString(KEY.IPTV_SOURCE_DEFAULT_URL.name, "") ?: "").ifBlank {
-            Constants.IPTV_SOURCE_URL
+            defaultIptvSourceUrl
         }
         set(value) = sp.edit().putString(KEY.IPTV_SOURCE_DEFAULT_URL.name, value).apply()
 

@@ -36,13 +36,7 @@ class LeanbackMainViewModel : ViewModel() {
 
     init {
         viewModelScope.launch {
-            // 每次启动时清空缓存，确保使用最新数据
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                iptvRepository.clearCache()
-                epgRepository.clearCache()
-            }
-            log.i("应用启动时已清除缓存")
-            
+            // 启动时优先读本地缓存，避免每次都卡在加载页等网络
             refreshIptv()
             refreshEpg()
         }
@@ -139,11 +133,13 @@ class LeanbackMainViewModel : ViewModel() {
             )
         }
             .retryWhen { _, attempt ->
-                if (attempt >= Constants.HTTP_RETRY_COUNT) return@retryWhen false
+                // 启动阶段少重试，避免卡在闪屏近一分钟
+                val maxRetry = minOf(3L, Constants.HTTP_RETRY_COUNT)
+                if (attempt >= maxRetry) return@retryWhen false
 
                 _uiState.value =
-                    LeanbackMainUiState.Loading("获取远程直播源(${attempt + 1}/${Constants.HTTP_RETRY_COUNT})...")
-                delay(Constants.HTTP_RETRY_INTERVAL)
+                    LeanbackMainUiState.Loading("获取远程直播源(${attempt + 1}/$maxRetry)...")
+                delay(1000L)
                 true
             }
             .catch { ex ->

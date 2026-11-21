@@ -41,17 +41,17 @@ class IptvRepository : FileCacheRepository("iptv.txt") {
             val candidates = Constants.iptvSourceFallbackUrls(sourceUrl, SP.githubProxy)
             log.d("获取远程直播源: $sourceUrl, 候选=${candidates.size}, 强制刷新: $forceRefresh")
 
+            // 超时要短：加速器挂起时尽快切到备用镜像，避免闪屏卡近一分钟
+            val clientBuilder = OkHttpClient.Builder()
+                .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                .writeTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                .callTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
             val client = if (forceRefresh) {
-                OkHttpClient.Builder()
-                    .cache(null)
-                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                    .build()
+                clientBuilder.cache(null).build()
             } else {
-                OkHttpClient.Builder()
-                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                    .build()
+                clientBuilder.build()
             }
 
             var lastError: Exception? = null
@@ -95,6 +95,13 @@ class IptvRepository : FileCacheRepository("iptv.txt") {
             requestBuilder
                 .header("User-Agent", Constants.VIDEO_PLAYER_USER_AGENT_APTV)
                 .header("X-App-Name", Constants.VIDEO_PLAYER_USER_AGENT_APTV)
+        } else {
+            // 部分 GitHub 加速器对 OkHttp 默认 UA 限速/失败
+            requestBuilder.header(
+                "User-Agent",
+                "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 " +
+                    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            )
         }
 
         if (forceRefresh) {

@@ -1,12 +1,11 @@
 {
   "android": {
-    "latest_version": "1.1.12",
-    "download_url": "https://github.com/jia070310/lemonTV/releases/download/v1.1.12/LemonIPTV-v1.1.12-release.apk",
+    "latest_version": "1.1.13",
+    "download_url": "https://github.com/jia070310/lemonTV/releases/download/v1.1.13/LemonIPTV-v1.1.13-release.apk",
     "update_log": [
-      "应用内支持手动切换与一键测速 GitHub 加速器",
-      "后台添加的自定义加速器可在应用内自由切换",
-      "修复加速器测速失败（浏览器 UA + 并行测速）",
-      "提示可通过后台添加新的加速器地址"
+      "修复每次启动卡在加载页近一分钟的问题",
+      "启动优先使用本地缓存，网络失败更快切备用镜像",
+      "缩短直播源请求超时与启动重试次数"
     ]
   },
   "windows": {

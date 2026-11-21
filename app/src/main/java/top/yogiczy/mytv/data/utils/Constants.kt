@@ -133,19 +133,20 @@ object Constants {
     fun iptvSourceFallbackUrls(sourceUrl: String, proxy: String = GITHUB_PROXY): List<String> {
         val u = migrateGithubProxyUrl(sourceUrl, proxy)
         return when {
+            // jsDelivr 通常比加速器更稳，优先作为备用，加速器超时后能快速恢复
             u.contains("jia070310/lemonTV") && u.contains("iptv-fe.m3u") -> listOf(
+                "https://fastly.jsdelivr.net/gh/jia070310/lemonTV@main/iptv-fe.m3u",
                 withGithubProxy(
                     "https://raw.githubusercontent.com/jia070310/lemonTV/main/iptv-fe.m3u",
                     proxy,
                 ),
-                "https://fastly.jsdelivr.net/gh/jia070310/lemonTV@main/iptv-fe.m3u",
             )
             u.contains("ioptu/migu-video") || u.contains("/migu.m3u") -> listOf(
+                "https://fastly.jsdelivr.net/gh/ioptu/migu-video@main/migu.m3u",
                 withGithubProxy(
                     "https://raw.githubusercontent.com/ioptu/migu-video/main/migu.m3u",
                     proxy,
                 ),
-                "https://fastly.jsdelivr.net/gh/ioptu/migu-video@main/migu.m3u",
             )
             else -> emptyList()
         }.let { fallbacks -> (listOf(u) + fallbacks).distinct() }

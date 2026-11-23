@@ -802,6 +802,13 @@
                                     </div>
                                     
                                     <div class="settings-card">
+                                        <label style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px; cursor: pointer;">
+                                            <input type="checkbox" v-model="settings.githubProxyEnabled" style="width: 18px; height: 18px;" />
+                                            <span style="font-size: 15px;">启用加速器</span>
+                                        </label>
+                                        <p style="margin: -8px 0 16px; color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.5;">
+                                            关闭后，用户添加的直播源按原链接拉取，不再替换成下面选中的加速器。链接里已经带了加速器时请关闭。
+                                        </p>
                                         <div class="input-group">
                                             <label class="input-label">推荐加速器（点选后可保存）</label>
                                             <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">

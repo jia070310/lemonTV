@@ -15,6 +15,7 @@ import top.yogiczy.mytv.data.entities.EpgProgrammeList
 import top.yogiczy.mytv.data.repositories.FileCacheRepository
 import top.yogiczy.mytv.data.repositories.epg.fetcher.EpgFetcher
 import top.yogiczy.mytv.data.utils.Constants
+import top.yogiczy.mytv.ui.utils.SP
 import top.yogiczy.mytv.utils.Logger
 import java.io.File
 import java.io.StringReader
@@ -305,10 +306,19 @@ private class EpgXmlRepository : FileCacheRepository("epg.xml") {
      * @param userAgent 可选的 User-Agent，来自直播源 #EXT-X-APP 参数
      */
     private suspend fun fetchXml(url: String, userAgent: String? = null): String = withContext(Dispatchers.IO) {
-        log.d("获取远程节目单xml: $url${if (userAgent != null) ", UA: $userAgent" else ""}")
+        val fetchUrl = if (Constants.needsGithubProxyForEpg(url)) {
+            SP.wrapGithubUrl(url)
+        } else {
+            url.trim()
+        }
+        log.d(
+            "获取远程节目单xml: $fetchUrl" +
+                (if (fetchUrl != url.trim()) " (原: $url)" else "") +
+                (if (userAgent != null) ", UA: $userAgent" else "")
+        )
 
         val client = OkHttpClient()
-        val requestBuilder = Request.Builder().url(url)
+        val requestBuilder = Request.Builder().url(fetchUrl)
         
             // 计算最终 UA：当链接域名是 aptv.app 时，强制使用 APTV 专用 UA
             val host = try {

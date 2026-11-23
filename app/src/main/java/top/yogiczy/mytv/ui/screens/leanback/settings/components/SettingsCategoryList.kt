@@ -12,9 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.foundation.lazy.list.TvLazyColumn
 import androidx.tv.foundation.lazy.list.itemsIndexed
 import top.yogiczy.mytv.ui.screens.leanback.settings.LeanbackSettingsCategories
+import top.yogiczy.mytv.ui.screens.leanback.settings.LeanbackSettingsGroup
 import top.yogiczy.mytv.ui.theme.LeanbackTheme
 import top.yogiczy.mytv.ui.utils.handleLeanbackKeyEvents
 
@@ -37,37 +38,46 @@ import top.yogiczy.mytv.ui.utils.handleLeanbackKeyEvents
 @Composable
 fun LeanbackSettingsCategoryList(
     modifier: Modifier = Modifier,
-    focusedCategoryProvider: () -> LeanbackSettingsCategories = { LeanbackSettingsCategories.entries.first() },
+    group: LeanbackSettingsGroup = LeanbackSettingsGroup.CHANNEL,
+    focusedCategoryProvider: () -> LeanbackSettingsCategories = {
+        LeanbackSettingsCategories.defaultOf(LeanbackSettingsGroup.CHANNEL)
+    },
     onFocused: (LeanbackSettingsCategories) -> Unit = {},
-    hasUpdateProvider: () -> Boolean = { false },  // 新增：是否有更新
+    hasUpdateProvider: () -> Boolean = { false },
+    /** 为 true 时切换大项会抢左侧第一项焦点；顶部大项切换时保持 false，避免抢走大项焦点 */
+    autoFocusFirst: Boolean = false,
+    /** 焦点在一级大项时为 false，二级不显示选中高亮 */
+    highlightSelected: Boolean = true,
 ) {
-    var hasFocused = rememberSaveable { false }
+    val categories = remember(group) { LeanbackSettingsCategories.ofGroup(group) }
 
-    TvLazyColumn(
-        contentPadding = PaddingValues(vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = modifier.focusRestorer()
-    ) {
-        itemsIndexed(LeanbackSettingsCategories.entries) { index, category ->
-            val isSelected by remember { derivedStateOf { focusedCategoryProvider() == category } }
-            val focusRequester = remember { FocusRequester() }
-            LaunchedEffect(Unit) {
-                if (index == 0 && !hasFocused) {
-                    focusRequester.requestFocus()
-                    hasFocused = true
+    key(group) {
+        TvLazyColumn(
+            contentPadding = PaddingValues(vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = modifier.focusRestorer()
+        ) {
+            itemsIndexed(categories) { index, category ->
+                val isCurrent by remember { derivedStateOf { focusedCategoryProvider() == category } }
+                val focusRequester = remember { FocusRequester() }
+                LaunchedEffect(group, autoFocusFirst) {
+                    if (autoFocusFirst && index == 0) {
+                        focusRequester.requestFocus()
+                    }
                 }
-            }
 
-            LeanbackSettingsCategoryItem(
-                modifier = Modifier.focusRequester(focusRequester),
-                icon = category.icon,
-                title = category.title,
-                isSelectedProvider = { isSelected },
-                onFocused = { onFocused(category) },
-                showBadgeProvider = { 
-                    category == LeanbackSettingsCategories.APP && hasUpdateProvider()
-                },  // APP分类显示红点
-            )
+                LeanbackSettingsCategoryItem(
+                    modifier = Modifier.focusRequester(focusRequester),
+                    icon = category.icon,
+                    title = category.title,
+                    // 只有焦点在二级时才允许「当前项」发黄；一级有焦点时全部保持普通态
+                    isSelectedProvider = { highlightSelected && isCurrent },
+                    onFocused = { onFocused(category) },
+                    showBadgeProvider = {
+                        category == LeanbackSettingsCategories.ABOUT && hasUpdateProvider()
+                    },
+                )
+            }
         }
     }
 }
@@ -79,7 +89,7 @@ private fun LeanbackSettingsCategoryItem(
     title: String,
     isSelectedProvider: () -> Boolean = { false },
     onFocused: () -> Unit = {},
-    showBadgeProvider: () -> Boolean = { false },  // 新增：是否显示红点
+    showBadgeProvider: () -> Boolean = { false },
 ) {
     val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
@@ -90,30 +100,30 @@ private fun LeanbackSettingsCategoryItem(
         androidx.tv.material3.ListItem(
             selected = isSelected,
             onClick = { },
-            leadingContent = { 
+            leadingContent = {
                 androidx.tv.material3.Icon(
-                    icon, 
+                    icon,
                     title,
-                    tint = if (isSelected) 
+                    tint = if (isSelected)
                         androidx.compose.ui.graphics.Color.Black
-                    else 
+                    else
                         androidx.compose.ui.graphics.Color.White
-                ) 
+                )
             },
-            headlineContent = { 
+            headlineContent = {
                 androidx.tv.material3.Text(
                     text = title,
                     color = if (isSelected)
                         androidx.compose.ui.graphics.Color.Black
-                    else 
+                    else
                         androidx.compose.ui.graphics.Color.White
-                ) 
+                )
             },
             colors = androidx.tv.material3.ListItemDefaults.colors(
                 containerColor = androidx.compose.ui.graphics.Color(0xFF1f1f1f),
-                focusedContainerColor = if (isSelected) 
-                    androidx.compose.ui.graphics.Color(0xFFfddd0e) 
-                else 
+                focusedContainerColor = if (isSelected)
+                    androidx.compose.ui.graphics.Color(0xFFfddd0e)
+                else
                     androidx.compose.ui.graphics.Color(0xFF2a2a2a),
                 selectedContainerColor = androidx.compose.ui.graphics.Color(0xFFfddd0e),
             ),
@@ -127,7 +137,7 @@ private fun LeanbackSettingsCategoryItem(
                     border = androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0x0DFFFFFF)),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
                 ),
-                focusedBorder = if (isSelected) 
+                focusedBorder = if (isSelected)
                     androidx.tv.material3.Border(
                         border = androidx.compose.foundation.BorderStroke(0.dp, androidx.compose.ui.graphics.Color.Transparent),
                         shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
@@ -146,7 +156,6 @@ private fun LeanbackSettingsCategoryItem(
                 .focusRequester(focusRequester)
                 .onFocusChanged {
                     val newFocused = it.isFocused || it.hasFocus
-                    // 优化：只在焦点状态真正改变时触发回调
                     if (newFocused && !isFocused) {
                         isFocused = true
                         onFocused()
@@ -161,8 +170,7 @@ private fun LeanbackSettingsCategoryItem(
                     }
                 ),
         )
-        
-        // 红点徽章
+
         if (showBadgeProvider()) {
             Box(
                 modifier = Modifier

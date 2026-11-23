@@ -250,6 +250,14 @@ class LeanbackSettingsViewModel : ViewModel() {
             SP.updateForceRemind = value
         }
 
+    private var _githubProxyEnabled by mutableStateOf(SP.githubProxyEnabled)
+    var githubProxyEnabled: Boolean
+        get() = _githubProxyEnabled
+        set(value) {
+            _githubProxyEnabled = value
+            SP.githubProxyEnabled = value
+        }
+
     private var _githubProxy by mutableStateOf(SP.githubProxy)
     var githubProxy: String
         get() = _githubProxy

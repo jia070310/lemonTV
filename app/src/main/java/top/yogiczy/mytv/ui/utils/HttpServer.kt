@@ -164,6 +164,7 @@ object HttpServer : Loggable() {
                         epgXmlUrlName = SP.iptvSourceNameMap[SP.epgXmlUrl] ?: "",
                         videoPlayerUserAgent = SP.videoPlayerUserAgent,
                         githubProxy = SP.githubProxy,
+                        githubProxyEnabled = SP.githubProxyEnabled,
                         githubProxyCandidates = SP.getGithubProxyList(),
                         logHistory = Logger.history,
                     )
@@ -184,7 +185,11 @@ object HttpServer : Loggable() {
         val videoPlayerUserAgent = body.optString("videoPlayerUserAgent", "")
         val githubProxy = body.optString("githubProxy", "")
 
-        // 自定义 GitHub 加速器：保存后迁移已有源地址
+        if (body.has("githubProxyEnabled")) {
+            SP.githubProxyEnabled = body.optBoolean("githubProxyEnabled", true)
+        }
+
+        // 自定义 GitHub 加速器：开启时保存后迁移已有源地址
         if (body.has("githubProxy")) {
             val normalized = Constants.normalizeGithubProxy(
                 githubProxy.ifBlank { Constants.GITHUB_PROXY }
@@ -201,7 +206,7 @@ object HttpServer : Loggable() {
         // 重要：网页推送只用于“新增/更新历史列表”，不改变当前已选中的直播源/节目单/UA。
         // 避免 UI 通过“当前值 == 列表项”计算 selected/勾选状态时自动选中新推送的数据。
         if (iptvSourceUrl.isNotBlank()) {
-            val migratedUrl = Constants.migrateGithubProxyUrl(iptvSourceUrl, SP.githubProxy)
+            val migratedUrl = SP.mapIptvSourceUrl(iptvSourceUrl)
             SP.iptvSourceUrlHistoryList = SP.iptvSourceUrlHistoryList + migratedUrl
             SP.iptvSourceDeletedList = SP.iptvSourceDeletedList - migratedUrl
             // 保存名称映射（同时用于节目单列表展示）
@@ -342,6 +347,7 @@ private data class AllSettings(
     val epgXmlUrlName: String,
     val videoPlayerUserAgent: String,
     val githubProxy: String,
+    val githubProxyEnabled: Boolean = true,
     val githubProxyCandidates: List<String> = emptyList(),
 
     val logHistory: List<Logger.HistoryItem>,

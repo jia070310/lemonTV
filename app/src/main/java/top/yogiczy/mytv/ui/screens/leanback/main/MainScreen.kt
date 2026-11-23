@@ -11,9 +11,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -36,11 +41,15 @@ import io.github.alexzhirkevich.qrose.options.QrShapes
 import io.github.alexzhirkevich.qrose.options.circle
 import io.github.alexzhirkevich.qrose.options.roundCorners
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
+import top.yogiczy.mytv.data.repositories.iptv.IptvSourceFailKind
+import top.yogiczy.mytv.data.repositories.iptv.label
 import top.yogiczy.mytv.ui.rememberLeanbackChildPadding
+import top.yogiczy.mytv.ui.screens.leanback.components.hintColor
 import top.yogiczy.mytv.ui.screens.leanback.components.LeanbackVisible
 import top.yogiczy.mytv.ui.screens.leanback.main.components.LeanbackBackPressHandledArea
 import top.yogiczy.mytv.ui.screens.leanback.main.components.LeanbackMainContent
 import top.yogiczy.mytv.ui.screens.leanback.settings.LeanbackSettingsScreen
+import top.yogiczy.mytv.ui.screens.leanback.settings.LeanbackSettingsViewModel
 import top.yogiczy.mytv.ui.theme.LeanbackTheme
 import top.yogiczy.mytv.ui.utils.HttpServer
 import top.yogiczy.mytv.ui.utils.handleLeanbackKeyEvents
@@ -50,8 +59,17 @@ fun LeanbackMainScreen(
     modifier: Modifier = Modifier,
     onBackPressed: () -> Unit = {},
     mainViewModel: LeanbackMainViewModel = viewModel(),
+    settingsViewModel: LeanbackSettingsViewModel = viewModel(),
 ) {
     val uiState by mainViewModel.uiState.collectAsState()
+
+    // 先绑勾选同步，再启动拉取，避免背后切源却仍显示默认源
+    LaunchedEffect(Unit) {
+        mainViewModel.bindSourceApplicator { url ->
+            settingsViewModel.iptvSourceUrl = url
+        }
+        mainViewModel.start()
+    }
 
     when (val s = uiState) {
         is LeanbackMainUiState.Ready -> LeanbackMainContent(
@@ -66,7 +84,9 @@ fun LeanbackMainScreen(
             onBackPressed = onBackPressed,
             mainViewModel = mainViewModel
         ) {
-            if (s.isInitial) {
+            if (s.asDialog) {
+                LeanbackMainScreenCacheDialog(s)
+            } else if (s.isInitial) {
                 // 初始启动：显示居中的启动画面
                 LeanbackMainScreenLoadingInitial { s.message }
             } else {
@@ -80,6 +100,88 @@ fun LeanbackMainScreen(
             mainViewModel = mainViewModel
         ) {
             LeanbackMainScreenError({ s.message })
+        }
+    }
+}
+
+@Composable
+private fun LeanbackMainScreenCacheDialog(state: LeanbackMainUiState.Loading) {
+    val title = when {
+        state.errorNotice -> "源不可用"
+        state.switchNotice -> "正在切换直播源"
+        else -> "正在处理"
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.72f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .width(300.dp)
+                .background(Color(0xFFfddd0e), RoundedCornerShape(12.dp))
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            if (!state.errorNotice) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    color = Color.Black,
+                    strokeWidth = 2.dp,
+                )
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = Color.Black,
+                fontWeight = FontWeight.Bold,
+            )
+            if (state.errorNotice) {
+                if (!state.fromSource.isNullOrBlank()) {
+                    Text(
+                        text = state.fromSource,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Black,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                val kind = state.failKind ?: IptvSourceFailKind.FetchFailed
+                Text(
+                    text = state.message ?: kind.label(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = kind.hintColor(),
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+            } else if (state.switchNotice) {
+                if (!state.fromSource.isNullOrBlank()) {
+                    val kind = state.failKind ?: IptvSourceFailKind.Expired
+                    Text(
+                        text = "${state.fromSource}  ${kind.label()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = kind.hintColor(),
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                if (!state.toSource.isNullOrBlank()) {
+                    Text(
+                        text = "切换到 ${state.toSource}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Black,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            } else if (!state.message.isNullOrBlank()) {
+                Text(
+                    text = state.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Black.copy(alpha = 0.75f),
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }

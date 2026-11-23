@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -61,6 +62,26 @@ fun LeanbackSettingsCategoryHttp(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(vertical = 10.dp),
     ) {
+        item {
+            LeanbackSettingsCategoryListItem(
+                headlineContent = "启用 GitHub 加速器",
+                supportingContent = if (settingsViewModel.githubProxyEnabled) {
+                    "自动把直播源里的 GitHub 地址换成当前加速器"
+                } else {
+                    "已关闭，直播源按填写的地址原样拉取，保留链接自带的加速器"
+                },
+                trailingContent = {
+                    Switch(
+                        checked = settingsViewModel.githubProxyEnabled,
+                        onCheckedChange = null,
+                    )
+                },
+                onSelected = {
+                    settingsViewModel.githubProxyEnabled = !settingsViewModel.githubProxyEnabled
+                },
+            )
+        }
+
         item {
             var showDialog by remember { mutableStateOf(false) }
 
@@ -127,7 +148,7 @@ fun LeanbackSettingsCategoryHttp(
 }
 
 @Composable
-private fun LeanbackSettingsGithubProxyDialog(
+internal fun LeanbackSettingsGithubProxyDialog(
     modifier: Modifier = Modifier,
     showDialogProvider: () -> Boolean = { false },
     onDismissRequest: () -> Unit = {},

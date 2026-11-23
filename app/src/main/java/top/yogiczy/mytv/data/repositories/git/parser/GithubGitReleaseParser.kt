@@ -5,7 +5,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import top.yogiczy.mytv.data.entities.GitRelease
-import top.yogiczy.mytv.data.utils.Constants
 import top.yogiczy.mytv.ui.utils.SP
 
 class GithubGitReleaseParser : GitReleaseParser {
@@ -20,7 +19,7 @@ class GithubGitReleaseParser : GitReleaseParser {
 
         return GitRelease(
             version = json.getValue("tag_name").jsonPrimitive.content.substring(1),
-            downloadUrl = Constants.withGithubProxy(assetUrl, SP.githubProxy),
+            downloadUrl = SP.wrapGithubUrl(assetUrl),
             description = json.getValue("body").jsonPrimitive.content
         )
     }

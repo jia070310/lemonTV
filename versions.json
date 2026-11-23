@@ -1,11 +1,13 @@
 {
   "android": {
-    "latest_version": "1.1.13",
-    "download_url": "https://github.com/jia070310/lemonTV/releases/download/v1.1.13/LemonIPTV-v1.1.13-release.apk",
+    "latest_version": "1.1.14",
+    "download_url": "https://github.com/jia070310/lemonTV/releases/download/v1.1.14/LemonIPTV-v1.1.14-release.apk",
     "update_log": [
-      "修复每次启动卡在加载页近一分钟的问题",
-      "启动优先使用本地缓存，网络失败更快切备用镜像",
-      "缩短直播源请求超时与启动重试次数"
+      "设置改版：直播设置 / 关于·其它，界面项移入直播设置",
+      "直播源失败提示后换源；优先本地缓存启动",
+      "频道台标（信息浮层 + 横/竖列表），走 GitHub 加速器与磁盘缓存",
+      "默认节目单更换为 migu playback.xml，拉取走加速器；移除失效旧地址",
+      "定时同步改为每小时，并同时检测 migu / cctv 上游变更"
     ]
   },
   "windows": {

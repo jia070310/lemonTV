@@ -3,6 +3,7 @@ package top.yogiczy.mytv.ui.screens.leanback.settings.components
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -18,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -35,7 +37,10 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yogiczy.mytv.data.repositories.iptv.IptvRepository
+import top.yogiczy.mytv.data.repositories.iptv.IptvSourceFailKind
+import top.yogiczy.mytv.data.repositories.iptv.label
 import top.yogiczy.mytv.data.utils.Constants
+import top.yogiczy.mytv.ui.screens.leanback.components.hintColor
 import top.yogiczy.mytv.ui.screens.leanback.components.LeanbackQrcodeDialog
 import top.yogiczy.mytv.ui.screens.leanback.settings.LeanbackSettingsViewModel
 import top.yogiczy.mytv.ui.screens.leanback.toast.LeanbackToastState
@@ -193,6 +198,7 @@ private fun LeanbackSettingsIptvSourceHistoryDialog(
     // 使用 State 来存储历史记录，以便可以动态更新
     var iptvSourceHistory by remember { mutableStateOf(iptvSourceHistoryProvider().toList()) }
     var nameMap by remember { mutableStateOf(SP.iptvSourceNameMap) }
+    var failMap by remember { mutableStateOf(SP.iptvSourceFailReasonMap) }
     val currentIptvSource = currentIptvSourceProvider()
 
     // 定期刷新历史记录，以便网页端推送后能自动显示
@@ -203,9 +209,11 @@ private fun LeanbackSettingsIptvSourceHistoryDialog(
                 // 直接从 SP 读取最新数据，合并默认源列表和历史记录
                 val newHistory = SP.getIptvSourceList()
                 val newNameMap = SP.iptvSourceNameMap
-                if (newHistory != iptvSourceHistory || newNameMap != nameMap) {
+                val newFailMap = SP.iptvSourceFailReasonMap
+                if (newHistory != iptvSourceHistory || newNameMap != nameMap || newFailMap != failMap) {
                     iptvSourceHistory = newHistory
                     nameMap = newNameMap
+                    failMap = newFailMap
                     Log.i("SettingsCategoryIptv", "检测到历史记录更新，已刷新列表，当前数量: ${newHistory.size}")
                 }
             }
@@ -293,20 +301,36 @@ private fun LeanbackSettingsIptvSourceHistoryDialog(
                                 ),
                             ),
                             headlineContent = {
-                                androidx.tv.material3.Text(
-                                    text = nameMap[source] ?: when {
-                                        source == SP.defaultIptvSourceUrl -> "默认源"
-                                        source.contains("migu.m3u") -> "咪咕源"
-                                        source.contains("aptv.app") -> "APTV"
-                                        source.contains("httop.m3u") && !source.contains("merged") -> "HTTOP源"
-                                        source.contains("httop_merged") -> "HTTOP合并源"
-                                        source.contains("iptv.m3u") && !source.contains("merged") -> "IPTV源"
-                                        source.contains("iptv_merged") -> "IPTV合并源"
-                                        else -> "自定义源"
-                                    },
+                                val sourceName = nameMap[source] ?: when {
+                                    source == SP.defaultIptvSourceUrl -> "默认源"
+                                    source.contains("migu.m3u") -> "咪咕源"
+                                    source.contains("aptv.app") -> "APTV"
+                                    source.contains("httop.m3u") && !source.contains("merged") -> "HTTOP源"
+                                    source.contains("httop_merged") -> "HTTOP合并源"
+                                    source.contains("iptv.m3u") && !source.contains("merged") -> "IPTV源"
+                                    source.contains("iptv_merged") -> "IPTV合并源"
+                                    else -> "自定义源"
+                                }
+                                val failKind = failMap[source]?.let { name ->
+                                    runCatching { IptvSourceFailKind.valueOf(name) }.getOrNull()
+                                }
+                                Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    maxLines = if (isFocused) Int.MAX_VALUE else 2,
-                                )
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    androidx.tv.material3.Text(
+                                        text = sourceName,
+                                        maxLines = if (isFocused) Int.MAX_VALUE else 1,
+                                    )
+                                    if (failKind != null) {
+                                        androidx.tv.material3.Text(
+                                            text = failKind.label(),
+                                            maxLines = 1,
+                                            fontWeight = FontWeight.Bold,
+                                            color = failKind.hintColor(onLightBackground = isFocused),
+                                        )
+                                    }
+                                }
                             },
                             supportingContent = if (isFocused || nameMap.containsKey(source) || source in SP.getIptvSourceList()) {
                                 {

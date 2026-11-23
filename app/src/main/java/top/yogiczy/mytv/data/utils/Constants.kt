@@ -33,8 +33,6 @@ object Constants {
                 "https://raw.githubusercontent.com/ioptu/migu-video/main/migu.m3u",
                 GITHUB_PROXY,
             ),
-            "https://fastly.jsdelivr.net/gh/jia070310/lemonTV@main/iptv-fe.m3u",
-            "https://fastly.jsdelivr.net/gh/ioptu/migu-video@main/migu.m3u",
         )
 
     /**
@@ -128,28 +126,18 @@ object Constants {
     }
 
     /**
-     * 同一直播源的备用拉取地址（按优先级）
+     * 同一直播源的拉取地址。
+     * 不再使用 jsDelivr 等 CDN 镜像：镜像常缓存旧内容，源文件已改成无效数据时
+     * 仍会拉到旧 m3u，表现为「删掉重装还能播」。
+     * 只拉用户选中的这一条（可选加速器改写），失败就按换源逻辑处理。
      */
-    fun iptvSourceFallbackUrls(sourceUrl: String, proxy: String = GITHUB_PROXY): List<String> {
-        val u = migrateGithubProxyUrl(sourceUrl, proxy)
-        return when {
-            // jsDelivr 通常比加速器更稳，优先作为备用，加速器超时后能快速恢复
-            u.contains("jia070310/lemonTV") && u.contains("iptv-fe.m3u") -> listOf(
-                "https://fastly.jsdelivr.net/gh/jia070310/lemonTV@main/iptv-fe.m3u",
-                withGithubProxy(
-                    "https://raw.githubusercontent.com/jia070310/lemonTV/main/iptv-fe.m3u",
-                    proxy,
-                ),
-            )
-            u.contains("ioptu/migu-video") || u.contains("/migu.m3u") -> listOf(
-                "https://fastly.jsdelivr.net/gh/ioptu/migu-video@main/migu.m3u",
-                withGithubProxy(
-                    "https://raw.githubusercontent.com/ioptu/migu-video/main/migu.m3u",
-                    proxy,
-                ),
-            )
-            else -> emptyList()
-        }.let { fallbacks -> (listOf(u) + fallbacks).distinct() }
+    fun iptvSourceFallbackUrls(
+        sourceUrl: String,
+        proxy: String = GITHUB_PROXY,
+        rewriteProxy: Boolean = true,
+    ): List<String> {
+        val u = if (rewriteProxy) migrateGithubProxyUrl(sourceUrl, proxy) else sourceUrl.trim()
+        return listOf(u).filter { it.isNotBlank() }.distinct()
     }
 
     /**
@@ -158,14 +146,26 @@ object Constants {
     const val IPTV_SOURCE_CACHE_TIME = 1000 * 60 * 60 * 24L // 24小时
 
     /**
-     * 节目单XML地址（主）
+     * 节目单 XML 默认地址（GitHub raw，拉取时经应用内加速器）
      */
-    const val EPG_XML_URL = "http://epg.51zmt.top:8000/e1.xml.gz"
+    const val EPG_XML_URL =
+        "https://raw.githubusercontent.com/develop202/migu_video/refs/heads/main/playback.xml"
 
-    /**
-     * 节目单XML备用地址
-     */
-    const val EPG_XML_URL_BACKUP = "https://epg.zsdc.eu.org/t.xml.gz"
+    /** 已失效的旧默认节目单，读取时自动迁移到 [EPG_XML_URL] */
+    val EPG_XML_URL_LEGACY = setOf(
+        "http://epg.51zmt.top:8000/e1.xml.gz",
+        "https://epg.zsdc.eu.org/t.xml.gz",
+    )
+
+    /** 是否需要走 GitHub 加速器的节目单地址 */
+    fun needsGithubProxyForEpg(url: String): Boolean {
+        val u = url.trim()
+        if (u.isBlank()) return false
+        if (usesGithubProxy(u)) return true
+        return u.contains("raw.githubusercontent.com", ignoreCase = true)
+            || u.contains("://github.com/", ignoreCase = true)
+            || u.contains("://api.github.com/", ignoreCase = true)
+    }
 
     /**
      * 节目单刷新时间阈值（小时）

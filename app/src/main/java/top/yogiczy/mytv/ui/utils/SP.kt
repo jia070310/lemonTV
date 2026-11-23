@@ -66,11 +66,17 @@ object SP {
         /** 直播源名称映射 */
         IPTV_SOURCE_NAME_MAP,
 
+        /** 直播源最近一次失败原因 */
+        IPTV_SOURCE_FAIL_REASON_MAP,
+
         /** 直播源默认源 */
         IPTV_SOURCE_DEFAULT_URL,
 
         /** GitHub 加速器地址 */
         GITHUB_PROXY,
+
+        /** 是否用应用内加速器改写直播源地址 */
+        GITHUB_PROXY_ENABLED,
 
         /** GitHub 加速器历史（含后台自定义） */
         GITHUB_PROXY_HISTORY_LIST,
@@ -180,6 +186,28 @@ object SP {
         get() = sp.getBoolean(KEY.IPTV_SOURCE_SIMPLIFY.name, false)
         set(value) = sp.edit().putBoolean(KEY.IPTV_SOURCE_SIMPLIFY.name, value).apply()
 
+    /**
+     * 是否启用应用内加速器。
+     * 关闭后直播源地址按用户填写的原样使用，不再替换成当前加速器。
+     */
+    var githubProxyEnabled: Boolean
+        get() = sp.getBoolean(KEY.GITHUB_PROXY_ENABLED.name, true)
+        set(value) = sp.edit().putBoolean(KEY.GITHUB_PROXY_ENABLED.name, value).apply()
+
+    /** 直播源地址：开启加速器时迁移到当前加速器，关闭时保持原链接 */
+    fun mapIptvSourceUrl(url: String): String {
+        val trimmed = url.trim()
+        if (!githubProxyEnabled || trimmed.isBlank()) return trimmed
+        return Constants.migrateGithubProxyUrl(trimmed, githubProxy)
+    }
+
+    /** GitHub 原始地址：开启加速器时加前缀，关闭时保持原链接 */
+    fun wrapGithubUrl(rawUrl: String): String {
+        val trimmed = rawUrl.trim()
+        if (!githubProxyEnabled || trimmed.isBlank()) return trimmed
+        return Constants.withGithubProxy(trimmed, githubProxy)
+    }
+
     /** GitHub 加速器地址（默认 Constants.GITHUB_PROXY） */
     var githubProxy: String
         get() {
@@ -218,32 +246,27 @@ object SP {
 
     /** 当前加速器下的默认直播源地址 */
     val defaultIptvSourceUrl: String
-        get() = Constants.withGithubProxy(
+        get() = wrapGithubUrl(
             "https://raw.githubusercontent.com/jia070310/lemonTV/main/iptv-fe.m3u",
-            githubProxy,
         )
 
     /** 直播源 url */
     var iptvSourceUrl: String
         get() {
             val raw = (sp.getString(KEY.IPTV_SOURCE_URL.name, "") ?: "").ifBlank {
-                Constants.withGithubProxy(
+                wrapGithubUrl(
                     "https://raw.githubusercontent.com/jia070310/lemonTV/main/iptv-fe.m3u",
-                    githubProxy,
                 )
             }
-            val migrated = Constants.migrateGithubProxyUrl(raw, githubProxy)
-            if (migrated != raw) {
+            val migrated = mapIptvSourceUrl(raw)
+            if (githubProxyEnabled && migrated != raw) {
                 // 自动纠正旧安装里保存的失效加速域，避免反复重试 10 次
                 sp.edit().putString(KEY.IPTV_SOURCE_URL.name, migrated).apply()
             }
             return migrated
         }
         set(value) = sp.edit()
-            .putString(
-                KEY.IPTV_SOURCE_URL.name,
-                Constants.migrateGithubProxyUrl(value, githubProxy),
-            )
+            .putString(KEY.IPTV_SOURCE_URL.name, mapIptvSourceUrl(value))
             .apply()
 
     /** 直播源缓存时间（毫秒） */
@@ -269,7 +292,7 @@ object SP {
     /** 获取所有可用的直播源列表（默认源 + 历史源，排除已删除；加速器地址按当前配置迁移） */
     fun getIptvSourceList(): List<String> =
         (Constants.IPTV_SOURCE_DEFAULT_LIST + iptvSourceUrlHistoryList)
-            .map { Constants.migrateGithubProxyUrl(it, githubProxy) }
+            .map(::mapIptvSourceUrl)
             .distinct()
             .filter { it !in iptvSourceDeletedList }
 
@@ -284,6 +307,8 @@ object SP {
 
         githubProxy = target
         rememberGithubProxy(target)
+        // 加速器关闭时只记住地址，不改写用户已经填好的源链接
+        if (!githubProxyEnabled) return
         // 直接写 SP，避免 getter/setter 再套一层迁移逻辑
         sp.edit()
             .putString(KEY.IPTV_SOURCE_URL.name, migrate(iptvSourceUrl))
@@ -297,6 +322,39 @@ object SP {
                 iptvSourceDeletedList.map(::migrate).toSet(),
             )
             .apply()
+    }
+
+    /** 直播源最近一次失败原因，key 为源地址，value 为 IptvSourceFailKind.name */
+    var iptvSourceFailReasonMap: Map<String, String>
+        get() = readJsonStringMap(KEY.IPTV_SOURCE_FAIL_REASON_MAP.name)
+        set(value) = writeJsonStringMap(KEY.IPTV_SOURCE_FAIL_REASON_MAP.name, value)
+
+    fun iptvSourceFailReason(url: String): String? = iptvSourceFailReasonMap[url]
+
+    fun setIptvSourceFailReason(url: String, reason: String?) {
+        iptvSourceFailReasonMap = if (reason.isNullOrBlank()) {
+            iptvSourceFailReasonMap - url
+        } else {
+            iptvSourceFailReasonMap + (url to reason)
+        }
+    }
+
+    private fun readJsonStringMap(key: String): Map<String, String> {
+        val jsonStr = sp.getString(key, "{}") ?: "{}"
+        return try {
+            val json = org.json.JSONObject(jsonStr)
+            buildMap {
+                json.keys().forEach { put(it, json.getString(it)) }
+            }
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
+    private fun writeJsonStringMap(key: String, value: Map<String, String>) {
+        val json = org.json.JSONObject()
+        value.forEach { (k, v) -> json.put(k, v) }
+        sp.edit().putString(key, json.toString()).apply()
     }
 
     /** 直播源名称映射 */
@@ -359,7 +417,10 @@ object SP {
 
     /** 节目单 xml url */
     var epgXmlUrl: String
-        get() = (sp.getString(KEY.EPG_XML_URL.name, "") ?: "").ifBlank { Constants.EPG_XML_URL }
+        get() {
+            val raw = (sp.getString(KEY.EPG_XML_URL.name, "") ?: "").ifBlank { Constants.EPG_XML_URL }
+            return if (raw in Constants.EPG_XML_URL_LEGACY) Constants.EPG_XML_URL else raw
+        }
         set(value) = sp.edit().putString(KEY.EPG_XML_URL.name, value).apply()
 
     /** 节目单刷新时间阈值（小时） */

@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,6 +33,7 @@ import androidx.tv.material3.CardDefaults
 import top.yogiczy.mytv.data.entities.EpgProgramme
 import top.yogiczy.mytv.data.entities.EpgProgramme.Companion.progress
 import top.yogiczy.mytv.data.entities.Iptv
+import top.yogiczy.mytv.ui.screens.leanback.components.LeanbackChannelLogo
 import top.yogiczy.mytv.ui.theme.LeanbackTheme
 import top.yogiczy.mytv.ui.utils.handleLeanbackKeyEvents
 
@@ -65,7 +67,7 @@ fun LeanbackPanelIptvItem(
     androidx.tv.material3.Card(
         onClick = { },
         modifier = modifier
-            .width(130.dp)
+            .width(168.dp)
             .height(54.dp)
             .focusRequester(focusRequester)
             .onFocusChanged {
@@ -101,28 +103,41 @@ fun LeanbackPanelIptvItem(
                 else MaterialTheme.colorScheme.background.copy(alpha = 0.8f),
             ),
         ) {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = iptv.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    color = if (isFocused) Color.Black
-                    else MaterialTheme.colorScheme.onBackground,
+                LeanbackChannelLogo(
+                    name = iptv.name,
+                    channelName = iptv.channelName,
+                    size = 32.dp,
+                    showPlaceholder = true,
                 )
 
-                Text(
-                    text = currentProgramme?.title ?: "",
-                    style = MaterialTheme.typography.labelSmall,
-                    maxLines = 1,
-                    modifier = Modifier.alpha(0.8f),
-                    color = if (isFocused) Color.Black
-                    else MaterialTheme.colorScheme.onBackground,
-                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.SpaceAround,
+                ) {
+                    Text(
+                        text = iptv.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1,
+                        color = if (isFocused) Color.Black
+                        else MaterialTheme.colorScheme.onBackground,
+                    )
+
+                    Text(
+                        text = currentProgramme?.title?.ifBlank { null } ?: "无节目",
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        modifier = Modifier.alpha(0.8f),
+                        color = if (isFocused) Color.Black
+                        else MaterialTheme.colorScheme.onBackground,
+                    )
+                }
             }
 
             // 节目进度条

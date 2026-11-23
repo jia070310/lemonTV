@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,6 +27,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.tv.foundation.lazy.list.TvLazyColumn
 import androidx.tv.foundation.lazy.list.itemsIndexed
@@ -37,8 +39,11 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import top.yogiczy.mytv.data.repositories.iptv.IptvSourceFailKind
+import top.yogiczy.mytv.data.repositories.iptv.label
 import top.yogiczy.mytv.data.utils.Constants
 import top.yogiczy.mytv.ui.rememberLeanbackChildPadding
+import top.yogiczy.mytv.ui.screens.leanback.components.hintColor
 import top.yogiczy.mytv.ui.screens.leanback.settings.LeanbackSettingsViewModel
 import top.yogiczy.mytv.ui.screens.leanback.toast.LeanbackToastState
 import top.yogiczy.mytv.ui.utils.SP
@@ -58,6 +63,7 @@ fun LeanbackQuickPanelIptvSourceDialog(
     // 获取所有源地址列表（默认源 + 历史源 + 自定义源）
     var sourceList by remember { mutableStateOf<List<String>>(emptyList()) }
     var nameMap by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var failMap by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     
     // 定期刷新列表，以便网页端推送后能自动显示
     LaunchedEffect(showDialogProvider()) {
@@ -66,6 +72,7 @@ fun LeanbackQuickPanelIptvSourceDialog(
                 val allSources = SP.getIptvSourceList()
                 sourceList = allSources
                 nameMap = SP.iptvSourceNameMap
+                failMap = SP.iptvSourceFailReasonMap
                 delay(1000)
             }
         }
@@ -138,20 +145,35 @@ fun LeanbackQuickPanelIptvSourceDialog(
                                     focusedScale = 1.02f,
                                 ),
                                 headlineContent = {
-                                    Text(
-                                        text = nameMap[url] ?: when {
-                                            url == SP.defaultIptvSourceUrl -> "默认源"
-                                            url.contains("migu.m3u") -> "咪咕源"
+                                    val sourceName = nameMap[url] ?: when {
+                                        url == SP.defaultIptvSourceUrl -> "默认源"
+                                        url.contains("migu.m3u") -> "咪咕源"
                                         url.contains("aptv.app") -> "APTV"
-                                            url.contains("httop.m3u") && !url.contains("merged") -> "HTTOP源"
-                                            url.contains("httop_merged") -> "HTTOP合并源"
-                                            url.contains("iptv.m3u") && !url.contains("merged") -> "IPTV源"
-                                            url.contains("iptv_merged") -> "IPTV合并源"
-                                            else -> "自定义源"
-                                        },
-                                        maxLines = 1,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                    )
+                                        url.contains("httop.m3u") && !url.contains("merged") -> "HTTOP源"
+                                        url.contains("httop_merged") -> "HTTOP合并源"
+                                        url.contains("iptv.m3u") && !url.contains("merged") -> "IPTV源"
+                                        url.contains("iptv_merged") -> "IPTV合并源"
+                                        else -> "自定义源"
+                                    }
+                                    val failKind = failMap[url]?.let { name ->
+                                        runCatching { IptvSourceFailKind.valueOf(name) }.getOrNull()
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(
+                                            text = sourceName,
+                                            maxLines = 1,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                        if (failKind != null) {
+                                            Text(
+                                                text = failKind.label(),
+                                                maxLines = 1,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = failKind.hintColor(onLightBackground = isFocused),
+                                            )
+                                        }
+                                    }
                                 },
                                 supportingContent = if (isFocused || isCurrentSource) {
                                     {

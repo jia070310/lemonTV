@@ -126,25 +126,13 @@ fun LeanbackSettingsCategoryEpg(
 
         item {
             LeanbackSettingsCategoryListItem(
-                headlineContent = "清除缓存",
-                supportingContent = "短按清除节目单缓存文件",
-                onSelected = {
-                    coroutineScope.launch { EpgRepository().clearCache() }
-                    LeanbackToastState.I.showToast("清除缓存成功")
-                },
-            )
-        }
-
-        item {
-            LeanbackSettingsCategoryListItem(
                 headlineContent = "刷新节目单",
                 supportingContent = "清除缓存并重新加载节目单数据",
                 onSelected = {
-                    coroutineScope.launch { 
+                    coroutineScope.launch {
                         EpgRepository().clearCache()
                         LeanbackToastState.I.showToast("已清除缓存，请稍候...")
                     }
-                    // 通知主界面刷新节目单
                     onEpgSourceChanged()
                 },
             )
@@ -163,7 +151,7 @@ private fun LeanbackSettingsEpgSourceHistoryDialog(
     onDeleted: (String) -> Unit = {},
 ) {
     // 预设地址列表（始终显示在最前面，不可删除）
-    val presetUrls = listOf(Constants.EPG_XML_URL, Constants.EPG_XML_URL_BACKUP)
+    val presetUrls = listOf(Constants.EPG_XML_URL)
 
     // 使用 State 来存储历史记录，以便可以动态更新
     var epgXmlUrlHistory by remember {
@@ -274,7 +262,6 @@ private fun LeanbackSettingsEpgSourceHistoryDialog(
                                 androidx.tv.material3.Text(
                                     text = when (url) {
                                         Constants.EPG_XML_URL -> "默认节目单"
-                                        Constants.EPG_XML_URL_BACKUP -> "备用节目单"
                                         else -> nameMap[url] ?: url
                                     },
                                     modifier = Modifier.fillMaxWidth(),

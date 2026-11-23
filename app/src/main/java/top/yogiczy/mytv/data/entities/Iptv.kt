@@ -18,6 +18,11 @@ data class Iptv(
     val channelName: String = "",
 
     /**
+     * 台标地址（m3u 中的 tvg-logo）
+     */
+    val logoUrl: String? = null,
+
+    /**
      * 播放地址
      */
     val urlList: List<String> = emptyList(),
@@ -36,6 +41,7 @@ data class Iptv(
         val EXAMPLE = Iptv(
             name = "CCTV-1",
             channelName = "cctv1",
+            logoUrl = "https://live.fanmingming.com/tv/CCTV1.png",
             urlList = listOf(
                 "http://dbiptv.sn.chinamobile.com/PLTV/88888890/224/3221226231/index.m3u8",
                 "http://[2409:8087:5e01:34::20]:6610/ZTE_CMS/00000001000000060000000000000131/index.m3u8?IAS",

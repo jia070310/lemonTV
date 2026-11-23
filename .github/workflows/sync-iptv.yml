@@ -2,8 +2,9 @@ name: Auto Sync IPTV with Email
 
 on:
   schedule:
-    # 轮询检测上游 migu.m3u 是否更新（真正整合只在有变化时执行）
-    - cron: '*/15 * * * *'
+    # GitHub 对高频 cron（如 */15）会严重推迟，实际常变成数小时一次。
+    # 改为每小时整点后 5 分，更接近预期；仍可能因平台负载延迟数分钟～数十分钟。
+    - cron: '5 * * * *'
   workflow_dispatch:
     inputs:
       force:
@@ -22,7 +23,7 @@ jobs:
       with:
         token: ${{ secrets.PAT_TOKEN }}
 
-    - name: Detect upstream migu.m3u update
+    - name: Detect upstream migu / cctv update
       id: detect
       run: |
         set -euo pipefail
@@ -30,46 +31,67 @@ jobs:
         STATE_FILE=".github/migu-sync-state"
         mkdir -p .github
 
-        echo "⬇️ 检测上游 migu.m3u ..."
+        echo "⬇️ 检测上游 migu.m3u / cctv.migu.m3u ..."
         curl -fsSL -o /tmp/upstream-migu.m3u \
           "https://raw.githubusercontent.com/ioptu/migu-video/main/migu.m3u"
+        curl -fsSL -o /tmp/upstream-cctv.m3u \
+          "https://raw.githubusercontent.com/ioptu/migu-video/main/cctv.migu.m3u"
 
         if ! head -1 /tmp/upstream-migu.m3u | grep -q "^#EXTM3U"; then
           echo "上游 migu.m3u 无效（缺少 #EXTM3U）"
           head -5 /tmp/upstream-migu.m3u || true
           exit 1
         fi
+        if [ ! -s /tmp/upstream-cctv.m3u ]; then
+          echo "上游 cctv.migu.m3u 为空"
+          exit 1
+        fi
 
         NEW_MIGU_HASH=$(sha256sum /tmp/upstream-migu.m3u | awk '{print $1}')
+        NEW_CCTV_HASH=$(sha256sum /tmp/upstream-cctv.m3u | awk '{print $1}')
         echo "upstream_migu_hash=$NEW_MIGU_HASH" >> "$GITHUB_OUTPUT"
+        echo "upstream_cctv_hash=$NEW_CCTV_HASH" >> "$GITHUB_OUTPUT"
 
         OLD_MIGU_HASH="none"
+        OLD_CCTV_HASH="none"
         if [ -f "$STATE_FILE" ]; then
-          # 格式: migu_sha256=<hash>
           OLD_MIGU_HASH=$(grep -E '^migu_sha256=' "$STATE_FILE" | cut -d= -f2- || true)
+          OLD_CCTV_HASH=$(grep -E '^cctv_sha256=' "$STATE_FILE" | cut -d= -f2- || true)
           OLD_MIGU_HASH=${OLD_MIGU_HASH:-none}
+          OLD_CCTV_HASH=${OLD_CCTV_HASH:-none}
         fi
         echo "old_migu_hash=$OLD_MIGU_HASH" >> "$GITHUB_OUTPUT"
+        echo "old_cctv_hash=$OLD_CCTV_HASH" >> "$GITHUB_OUTPUT"
 
         FORCE="${{ github.event.inputs.force || 'false' }}"
         if [ "$FORCE" = "true" ]; then
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "reason=force" >> "$GITHUB_OUTPUT"
           echo "🔧 手动强制整合"
-        elif [ "$OLD_MIGU_HASH" = "none" ]; then
+        elif [ "$OLD_MIGU_HASH" = "none" ] || [ "$OLD_CCTV_HASH" = "none" ]; then
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "reason=first_run" >> "$GITHUB_OUTPUT"
           echo "🆕 首次同步，将执行整合"
-        elif [ "$OLD_MIGU_HASH" != "$NEW_MIGU_HASH" ]; then
+        elif [ "$OLD_MIGU_HASH" != "$NEW_MIGU_HASH" ] || [ "$OLD_CCTV_HASH" != "$NEW_CCTV_HASH" ]; then
           echo "changed=true" >> "$GITHUB_OUTPUT"
-          echo "reason=migu_updated" >> "$GITHUB_OUTPUT"
-          echo "✅ 检测到 migu.m3u 已更新"
-          echo "   旧: $OLD_MIGU_HASH"
-          echo "   新: $NEW_MIGU_HASH"
+          if [ "$OLD_MIGU_HASH" != "$NEW_MIGU_HASH" ] && [ "$OLD_CCTV_HASH" != "$NEW_CCTV_HASH" ]; then
+            echo "reason=migu_and_cctv_updated" >> "$GITHUB_OUTPUT"
+            echo "✅ 检测到 migu.m3u 与 cctv.migu.m3u 均已更新"
+          elif [ "$OLD_MIGU_HASH" != "$NEW_MIGU_HASH" ]; then
+            echo "reason=migu_updated" >> "$GITHUB_OUTPUT"
+            echo "✅ 检测到 migu.m3u 已更新"
+          else
+            echo "reason=cctv_updated" >> "$GITHUB_OUTPUT"
+            echo "✅ 检测到 cctv.migu.m3u 已更新"
+          fi
+          echo "   migu 旧: $OLD_MIGU_HASH"
+          echo "   migu 新: $NEW_MIGU_HASH"
+          echo "   cctv 旧: $OLD_CCTV_HASH"
+          echo "   cctv 新: $NEW_CCTV_HASH"
         else
           echo "changed=false" >> "$GITHUB_OUTPUT"
           echo "reason=unchanged" >> "$GITHUB_OUTPUT"
-          echo "⏭️ migu.m3u 未变化，跳过整合"
+          echo "⏭️ 上游未变化，跳过整合"
         fi
 
     - name: Download cctv.m3u, fix and merge
@@ -78,22 +100,14 @@ jobs:
       run: |
         set -euo pipefail
 
-        # migu 已在检测步骤下载；再拉 cctv 并整合
+        # 上游文件已在检测步骤下载
         cp /tmp/upstream-migu.m3u migu.m3u
-        curl -fsSL -o cctv_raw.m3u \
-          "https://raw.githubusercontent.com/ioptu/migu-video/main/cctv.migu.m3u"
-
-        if [ ! -s cctv_raw.m3u ]; then
-          echo "cctv.migu.m3u 为空"
-          exit 1
-        fi
+        cp /tmp/upstream-cctv.m3u cctv_raw.m3u
 
         CCTV_HASH=$(sha256sum cctv_raw.m3u | awk '{print $1}')
         echo "upstream_cctv_hash=$CCTV_HASH" >> "$GITHUB_OUTPUT"
 
         # 修正 cctv：在 tvg-logo="..." 后插入 group-title="央视专版"
-        # 原始：#EXTINF:-1 tvg-id="CCTV1" ... tvg-logo="..."CCTV1
-        # 目标：#EXTINF:-1 ... tvg-logo="...",group-title="央视专版",CCTV1
         sed -i 's/\(tvg-logo="[^"]*"\)/\1,group-title="央视专版",/' cctv_raw.m3u
 
         # 合并：保留 migu 头部，追加修正后的 cctv（去掉重复 #EXTM3U）
@@ -122,7 +136,6 @@ jobs:
         echo "source1_lines=$LINES1" >> "$GITHUB_OUTPUT"
         echo "source2_lines=$LINES2" >> "$GITHUB_OUTPUT"
 
-        # 旧产物哈希（用于邮件对比）
         if [ -f "iptv-fe.m3u" ]; then
           OLD_OUT=$(sha256sum iptv-fe.m3u | awk '{print $1}')
         else
@@ -141,7 +154,7 @@ jobs:
         mkdir -p .github
         cat > .github/migu-sync-state <<EOF
         migu_sha256=${{ steps.detect.outputs.upstream_migu_hash }}
-        cctv_sha256=${{ steps.download.outputs.upstream_cctv_hash }}
+        cctv_sha256=${{ steps.detect.outputs.upstream_cctv_hash }}
         output_sha256=${{ steps.download.outputs.new_hash }}
         updated_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
         reason=${{ steps.detect.outputs.reason }}
@@ -155,12 +168,13 @@ jobs:
           echo "pushed=false" >> "$GITHUB_OUTPUT"
           echo "ℹ️ 整合结果与仓库一致，无需提交"
         else
-          git commit -m "🔄 检测到 migu.m3u 更新，自动整合 IPTV: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          git commit -m "🔄 上游更新，自动整合 IPTV: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 
         触发原因: ${{ steps.detect.outputs.reason }}
         源文件1: migu.m3u
         源文件2: cctv.migu.m3u (已添加 group-title=\"央视专版\")
         migu哈希: ${{ steps.detect.outputs.upstream_migu_hash }}
+        cctv哈希: ${{ steps.detect.outputs.upstream_cctv_hash }}
         合并后哈希: ${{ steps.download.outputs.new_hash }}"
           git push origin HEAD
           echo "pushed=true" >> "$GITHUB_OUTPUT"
@@ -174,11 +188,11 @@ jobs:
         server_port: 465
         username: ${{ secrets.EMAIL_USER }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "✅ IPTV已按 migu.m3u 更新整合 - $(date -u '+%Y-%m-%d %H:%M') UTC"
+        subject: "✅ IPTV已按上游更新整合 - $(date -u '+%Y-%m-%d %H:%M') UTC"
         to: ${{ secrets.NOTIFY_EMAIL }}
         from: GitHub Actions <actions@github.com>
         html_body: |
-          <h2>📡 检测到 migu.m3u 更新并完成整合</h2>
+          <h2>📡 检测到上游更新并完成整合</h2>
           <div style="background-color: #f0f8ff; padding: 15px; border-radius: 5px;">
             <p><strong>🔄 同步状态：</strong> <span style="color: green;">✅ 成功更新</span></p>
             <p><strong>📌 触发原因：</strong> ${{ steps.detect.outputs.reason }}</p>
@@ -191,6 +205,8 @@ jobs:
             <h3>📊 哈希信息</h3>
             <p><strong>上游 migu 新哈希：</strong> <code>${{ steps.detect.outputs.upstream_migu_hash }}</code></p>
             <p><strong>上游 migu 旧哈希：</strong> <code>${{ steps.detect.outputs.old_migu_hash }}</code></p>
+            <p><strong>上游 cctv 新哈希：</strong> <code>${{ steps.detect.outputs.upstream_cctv_hash }}</code></p>
+            <p><strong>上游 cctv 旧哈希：</strong> <code>${{ steps.detect.outputs.old_cctv_hash }}</code></p>
             <p><strong>整合产物新哈希：</strong> <code>${{ steps.download.outputs.new_hash }}</code></p>
             <p><strong>整合产物旧哈希：</strong> <code>${{ steps.download.outputs.old_output_hash }}</code></p>
           </div>
@@ -199,5 +215,6 @@ jobs:
     - name: Log no upstream changes
       if: steps.detect.outputs.changed == 'false'
       run: |
-        echo "⏭️ $(date -u '+%Y-%m-%d %H:%M:%S UTC') - 上游 migu.m3u 未变化，跳过整合"
-        echo "当前哈希: ${{ steps.detect.outputs.upstream_migu_hash }}"
+        echo "⏭️ $(date -u '+%Y-%m-%d %H:%M:%S UTC') - 上游未变化，跳过整合"
+        echo "migu: ${{ steps.detect.outputs.upstream_migu_hash }}"
+        echo "cctv: ${{ steps.detect.outputs.upstream_cctv_hash }}"

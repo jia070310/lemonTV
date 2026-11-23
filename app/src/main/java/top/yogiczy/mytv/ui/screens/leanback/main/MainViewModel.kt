@@ -2,6 +2,7 @@ package top.yogiczy.mytv.ui.screens.leanback.main
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,12 +15,15 @@ import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import top.yogiczy.mytv.AppGlobal
 import top.yogiczy.mytv.data.entities.EpgList
 import top.yogiczy.mytv.data.entities.IptvGroupList
 import top.yogiczy.mytv.data.entities.IptvGroupList.Companion.iptvList
 import top.yogiczy.mytv.data.repositories.epg.EpgRepository
 import top.yogiczy.mytv.data.repositories.iptv.IptvRepository
+import top.yogiczy.mytv.data.repositories.iptv.IptvSourceFailKind
+import top.yogiczy.mytv.data.repositories.iptv.iptvFailKind
 import top.yogiczy.mytv.data.utils.Constants
 import top.yogiczy.mytv.ui.screens.leanback.toast.LeanbackToastState
 import top.yogiczy.mytv.ui.utils.HttpServer
@@ -27,6 +31,11 @@ import top.yogiczy.mytv.ui.utils.SP
 import top.yogiczy.mytv.utils.Logger
 
 class LeanbackMainViewModel : ViewModel() {
+    companion object {
+        /** 清理缓存弹窗至少停留这么久，方便看清提示，也给重新拉取留出时间 */
+        private const val CACHE_CLEAR_DIALOG_MS = 1800L
+    }
+
     private val log = Logger.create(javaClass.simpleName)
     private val iptvRepository = IptvRepository()
     private val epgRepository = EpgRepository()
@@ -34,11 +43,35 @@ class LeanbackMainViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<LeanbackMainUiState>(LeanbackMainUiState.Loading(isInitial = true))
     val uiState: StateFlow<LeanbackMainUiState> = _uiState.asStateFlow()
 
-    init {
+    /** 播放失败后已经强制重拉过的源，避免同一份旧缓存反复重试 */
+    private val playbackRefetchedSources = mutableSetOf<String>()
+    /** 清理弹窗期间先拉好的直播源，弹窗结束后再进入播放 */
+    private var pendingIptvGroupList: IptvGroupList? = null
+    /** 重拉之后仍然无法播放（或拉取失败）的源 */
+    private val playbackDeadSources = mutableSetOf<String>()
+    /** m3u 已经拉取成功过的源；之后频道仍失败则视为直播地址过期 */
+    private val playbackFetchedOk = mutableSetOf<String>()
+    private var failoverJob: Job? = null
+    private var lastLoadFailKind = IptvSourceFailKind.FetchFailed
+    /** 由界面注入，保证换源时勾选与 SP 同步 */
+    private var sourceApplicator: ((String) -> Unit)? = null
+    private var started = false
+
+    fun bindSourceApplicator(apply: (String) -> Unit) {
+        sourceApplicator = apply
+    }
+
+    /** 等界面绑好勾选同步后再启动，避免背后切源时仍显示旧勾选 */
+    fun start() {
+        if (started) return
+        started = true
         viewModelScope.launch {
-            // 启动时优先读本地缓存，避免每次都卡在加载页等网络
-            refreshIptv()
-            refreshEpg()
+            // 启动优先用本地缓存；缓存无效/过期再拉远端，播不通再走换源
+            if (refreshIptv(forceRefresh = false, publishError = false)) {
+                refreshEpg()
+            } else {
+                failoverFromCurrent(lastLoadFailKind)
+            }
         }
     }
 
@@ -47,27 +80,199 @@ class LeanbackMainViewModel : ViewModel() {
      */
     fun refresh() {
         log.i("开始刷新直播源和节目单，当前源: ${SP.iptvSourceUrl}")
-        // 先设置为 Loading 状态，触发 UI 重组
+        playbackRefetchedSources.clear()
+        playbackDeadSources.clear()
+        playbackFetchedOk.clear()
+        failoverJob?.cancel()
         _uiState.value = LeanbackMainUiState.Loading("正在切换直播源...")
         
         viewModelScope.launch {
             try {
-                // 先清除缓存，确保获取最新数据
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    iptvRepository.clearCache()
-                    epgRepository.clearCache()
+                if (reloadCurrentSource(publishError = false)) {
+                    log.i("直播源刷新完成")
+                } else {
+                    failoverFromCurrent(lastLoadFailKind)
                 }
-                log.i("已清除缓存")
-                // 等待一小段时间确保文件已删除
-                delay(100)
-                // 刷新数据
-                log.i("开始重新加载直播源数据")
-                refreshIptv()
-                refreshEpg()
             } catch (e: Exception) {
                 log.e("刷新失败", e)
             }
         }
+    }
+
+    /**
+     * m3u 已拉取成功，但连续多个频道播不通：判定直播源链接失效，先报错再换源。
+     */
+    fun handleUnplayableChannels(applySourceUrl: (String) -> Unit) {
+        failoverFromCurrent(IptvSourceFailKind.Expired, applySourceUrl)
+    }
+
+    /**
+     * 空文件 / 非 m3u / 链接超时等：不测频道，先报错再换源。
+     */
+    fun rejectCurrentSource(
+        kind: IptvSourceFailKind,
+        applySourceUrl: ((String) -> Unit)? = null,
+    ) {
+        failoverFromCurrent(kind, applySourceUrl)
+    }
+
+    fun clearCurrentSourceFailure() {
+        SP.setIptvSourceFailReason(SP.iptvSourceUrl, null)
+    }
+
+    /**
+     * 统一换源：
+     * 1) 先弹出当前源的失败原因（用户能看清）
+     * 2) 再写入下一个源为当前选中源
+     * 3) 提示“正在切换”，并拉取新源
+     * 4) 没有可切源时进入二维码错误页
+     */
+    private fun failoverFromCurrent(
+        kind: IptvSourceFailKind,
+        applySourceUrl: ((String) -> Unit)? = null,
+    ) {
+        if (failoverJob?.isActive == true) return
+        failoverJob = viewModelScope.launch {
+            var failedUrl = SP.iptvSourceUrl
+            var failedKind = kind
+            SP.setIptvSourceFailReason(failedUrl, failedKind.name)
+            playbackDeadSources += failedUrl
+            playbackRefetchedSources += failedUrl
+
+            // 先报错，停一下，避免背后偷偷切源
+            showSourceErrorDialog(sourceTitle(failedUrl), failedKind)
+            delay(CACHE_CLEAR_DIALOG_MS)
+
+            val sources = (listOf(failedUrl) + SP.getIptvSourceList()).distinct()
+            val start = sources.indexOf(failedUrl).coerceAtLeast(0)
+            for (step in 1 until sources.size) {
+                val candidate = sources[(start + step) % sources.size]
+                if (candidate.isBlank() || candidate == failedUrl || candidate in playbackDeadSources) continue
+
+                // 先改选中源，界面勾选与真实源保持一致
+                val apply = applySourceUrl ?: sourceApplicator
+                if (apply != null) apply(candidate) else SP.iptvSourceUrl = candidate
+                playbackRefetchedSources += candidate
+
+                showSourceSwitchDialog(
+                    fromSource = sourceTitle(failedUrl),
+                    toSource = sourceTitle(candidate),
+                    failKind = failedKind,
+                    toFailKind = null,
+                )
+                delay(900L)
+
+                val loaded = reloadCurrentSource(
+                    publishError = false,
+                    dialogMessage = null,
+                    publishWhenDone = false,
+                    keepDialog = true,
+                )
+                if (loaded) {
+                    val pending = pendingIptvGroupList
+                    pendingIptvGroupList = null
+                    if (pending != null) {
+                        playbackFetchedOk += candidate
+                        SP.setIptvSourceFailReason(candidate, null)
+                        _uiState.value = LeanbackMainUiState.Ready(iptvGroupList = pending)
+                        refreshEpg()
+                        return@launch
+                    }
+                }
+
+                pendingIptvGroupList = null
+                playbackDeadSources += candidate
+                failedUrl = candidate
+                failedKind = lastLoadFailKind
+                SP.setIptvSourceFailReason(failedUrl, failedKind.name)
+                showSourceErrorDialog(sourceTitle(failedUrl), failedKind)
+                delay(CACHE_CLEAR_DIALOG_MS)
+            }
+
+            log.w("所有直播源均无法播放")
+            _uiState.value = LeanbackMainUiState.Error("所有直播源均无法播放，请扫描二维码添加新的直播源")
+        }
+    }
+
+    private fun showSourceErrorDialog(sourceName: String, kind: IptvSourceFailKind) {
+        _uiState.value = LeanbackMainUiState.Loading(
+            asDialog = true,
+            errorNotice = true,
+            fromSource = sourceName,
+            failKind = kind,
+            message = when (kind) {
+                IptvSourceFailKind.Timeout -> "源链接连接超时"
+                IptvSourceFailKind.Empty -> "源文件错误，不是可用的 m3u"
+                IptvSourceFailKind.Expired -> "直播源链接已失效"
+                IptvSourceFailKind.FetchFailed -> "源链接无效"
+            },
+        )
+    }
+
+    private fun showSourceSwitchDialog(
+        fromSource: String,
+        toSource: String,
+        failKind: IptvSourceFailKind,
+        toFailKind: IptvSourceFailKind?,
+    ) {
+        _uiState.value = LeanbackMainUiState.Loading(
+            asDialog = true,
+            switchNotice = true,
+            fromSource = fromSource,
+            toSource = toSource,
+            failKind = failKind,
+            toFailKind = toFailKind,
+            message = "正在切换到 $toSource",
+        )
+    }
+
+    private fun sourceTitle(url: String): String {
+        val named = SP.iptvSourceNameMap[url]?.trim().orEmpty()
+        if (named.isNotBlank()) return named
+        return when {
+            url.contains("migu", ignoreCase = true) -> "咪咕"
+            url.contains("lemonTV", ignoreCase = true) || url.contains("iptv-fe.m3u") -> "默认源"
+            else -> url.substringAfter("://").substringBefore("/").ifBlank { "直播源" }
+        }
+    }
+
+    private suspend fun reloadCurrentSource(
+        publishError: Boolean,
+        dialogMessage: String? = null,
+        publishWhenDone: Boolean = true,
+        keepDialog: Boolean = false,
+    ): Boolean {
+        val startedAt = System.currentTimeMillis()
+        if (dialogMessage != null) {
+            _uiState.value = LeanbackMainUiState.Loading(dialogMessage, asDialog = true)
+        }
+        withContext(kotlinx.coroutines.Dispatchers.IO) {
+            iptvRepository.clearCache()
+            epgRepository.clearCache()
+        }
+        delay(100)
+        pendingIptvGroupList = null
+        val ok = refreshIptv(
+            forceRefresh = true,
+            publishError = publishError,
+            asDialog = dialogMessage != null || keepDialog,
+            publishReady = false,
+        )
+        if (dialogMessage != null && !keepDialog) {
+            val remain = CACHE_CLEAR_DIALOG_MS - (System.currentTimeMillis() - startedAt)
+            if (remain > 0) delay(remain)
+        }
+        val pending = pendingIptvGroupList
+        if (ok && pending != null) {
+            if (publishWhenDone) {
+                pendingIptvGroupList = null
+                _uiState.value = LeanbackMainUiState.Ready(iptvGroupList = pending)
+                refreshEpg()
+            }
+            return true
+        }
+        pendingIptvGroupList = null
+        return false
     }
     
     /**
@@ -122,44 +327,68 @@ class LeanbackMainViewModel : ViewModel() {
         }
     }
 
-    private suspend fun refreshIptv() {
+    private suspend fun refreshIptv(
+        forceRefresh: Boolean = false,
+        publishError: Boolean = true,
+        asDialog: Boolean = false,
+        publishReady: Boolean = true,
+    ): Boolean {
+        var success = false
         flow {
             emit(
                 iptvRepository.getIptvGroupList(
                     sourceUrl = SP.iptvSourceUrl,
                     cacheTime = SP.iptvSourceCacheTime,
                     simplify = SP.iptvSourceSimplify,
+                    forceRefresh = forceRefresh,
                 )
             )
         }
-            .retryWhen { _, attempt ->
+            .retryWhen { cause, attempt ->
+                val kind = cause.iptvFailKind()
+                if (kind == IptvSourceFailKind.Timeout || kind == IptvSourceFailKind.Empty) {
+                    return@retryWhen false
+                }
                 // 启动阶段少重试，避免卡在闪屏近一分钟
                 val maxRetry = minOf(3L, Constants.HTTP_RETRY_COUNT)
                 if (attempt >= maxRetry) return@retryWhen false
 
-                _uiState.value =
-                    LeanbackMainUiState.Loading("获取远程直播源(${attempt + 1}/$maxRetry)...")
+                _uiState.value = LeanbackMainUiState.Loading(
+                    "获取远程直播源(${attempt + 1}/$maxRetry)...",
+                    asDialog = asDialog,
+                )
                 delay(1000L)
                 true
             }
             .catch { ex ->
                 log.e("获取直播源失败", ex)
+                lastLoadFailKind = ex.iptvFailKind()
+                SP.setIptvSourceFailReason(SP.iptvSourceUrl, lastLoadFailKind.name)
                 val baseMessage = ex.message ?: "获取远程直播源失败"
                 val message = if (baseMessage.contains("加速器")) {
                     "$baseMessage：${HttpServer.serverUrl}"
                 } else {
                     baseMessage
                 }
-                _uiState.value = LeanbackMainUiState.Error(message)
-                if (baseMessage.contains("加速器")) {
-                    LeanbackToastState.I.showToast(message)
+                // 统一换源会自行弹报错/二维码，这里避免抢先进错误页
+                if (publishError) {
+                    _uiState.value = LeanbackMainUiState.Error(message)
+                    if (baseMessage.contains("加速器")) {
+                        LeanbackToastState.I.showToast(message)
+                    }
                 }
                 SP.iptvSourceUrlHistoryList -= SP.iptvSourceUrl
-                // 捕获异常后不再继续执行，直接返回
+                success = false
             }
             .collect { iptvGroupList ->
                 // 只有成功时才会执行到这里
-                _uiState.value = LeanbackMainUiState.Ready(iptvGroupList = iptvGroupList)
+                success = true
+                SP.setIptvSourceFailReason(SP.iptvSourceUrl, null)
+                if (publishReady) {
+                    _uiState.value = LeanbackMainUiState.Ready(iptvGroupList = iptvGroupList)
+                } else {
+                    pendingIptvGroupList = iptvGroupList
+                }
                 SP.iptvSourceUrlHistoryList += SP.iptvSourceUrl
                 
                 // 保存提取的 User-Agent 到全局变量，供播放器使用
@@ -174,6 +403,7 @@ class LeanbackMainViewModel : ViewModel() {
                     log.i("保存提取的 APP 名称 (#EXT-X-APP): ${AppGlobal.extractedAppName}")
                 }
             }
+        return success
     }
 
     private suspend fun refreshEpg() {
@@ -181,28 +411,36 @@ class LeanbackMainViewModel : ViewModel() {
             val iptvGroupList = (_uiState.value as LeanbackMainUiState.Ready).iptvGroupList
 
             flow {
-                // EPG 地址降级策略：
-                // 1. 优先使用直播源中提取的 EPG 地址列表（按顺序尝试）
-                // 2. 如果都失败，使用默认主 EPG 地址
-                // 3. 如果还失败，使用默认备用 EPG 地址
-                
-                val extractedUrls = iptvRepository.extractedEpgUrls
-                log.i("从直播源提取的 EPG 地址数量: ${extractedUrls.size}, 地址列表: ${extractedUrls.joinToString(", ")}")
-                
-                // 默认地址：主 + 备用
-                val defaultUrls = listOf(Constants.EPG_XML_URL, Constants.EPG_XML_URL_BACKUP)
-                
-                // 合并所有地址：提取的地址 + 默认地址
-                val allUrls = extractedUrls + defaultUrls
-                log.i("EPG 降级地址列表（共 ${allUrls.size} 个）: ${allUrls.joinToString(", ")}")
-                
-                val primaryUrl = extractedUrls.firstOrNull() ?: Constants.EPG_XML_URL
-                val fallbackUrls = if (extractedUrls.isNotEmpty()) {
-                    extractedUrls.drop(1) + defaultUrls
-                } else {
-                    listOf(Constants.EPG_XML_URL_BACKUP)
+                if (!SP.epgEnable) {
+                    log.i("节目单已关闭，跳过加载")
+                    emit(EpgList())
+                    return@flow
                 }
-                
+
+                // EPG 地址降级：
+                // 1. 用户自定义节目单（非默认）优先
+                // 2. 直播源 m3u 内提取的 EPG 地址（按顺序）
+                // 3. 默认节目单（GitHub，走加速器）
+                val extractedUrls = iptvRepository.extractedEpgUrls
+                val configuredUrl = SP.epgXmlUrl
+                val isCustom = configuredUrl.isNotBlank() && configuredUrl != Constants.EPG_XML_URL
+
+                log.i(
+                    "从直播源提取的 EPG 地址数量: ${extractedUrls.size}, " +
+                        "地址列表: ${extractedUrls.joinToString(", ")}"
+                )
+
+                val urlsToTry = buildList {
+                    if (isCustom) add(configuredUrl)
+                    addAll(extractedUrls)
+                    add(Constants.EPG_XML_URL)
+                }.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+
+                log.i("EPG 降级地址列表（共 ${urlsToTry.size} 个）: ${urlsToTry.joinToString(", ")}")
+
+                val primaryUrl = urlsToTry.first()
+                val fallbackUrls = urlsToTry.drop(1)
+
                 val (epgList, usedUrl) = epgRepository.getEpgListWithFallback(
                     primaryUrl = primaryUrl,
                     fallbackUrls = fallbackUrls,
@@ -210,13 +448,12 @@ class LeanbackMainViewModel : ViewModel() {
                     refreshTimeThreshold = SP.epgRefreshTimeThreshold,
                     userAgent = iptvRepository.extractedAppName,
                 )
-                
-                // 如果使用了直播源中的 EPG 地址且成功，记录到历史
+
                 if (usedUrl != null && usedUrl in extractedUrls) {
                     log.i("使用直播源中的 EPG 地址成功: $usedUrl")
                     SP.epgXmlUrlHistoryList += usedUrl
                 }
-                
+
                 emit(epgList)
             }
                 .retry(Constants.HTTP_RETRY_COUNT) { delay(Constants.HTTP_RETRY_INTERVAL); true }
@@ -237,7 +474,18 @@ class LeanbackMainViewModel : ViewModel() {
 }
 
 sealed interface LeanbackMainUiState {
-    data class Loading(val message: String? = null, val isInitial: Boolean = false) : LeanbackMainUiState
+    data class Loading(
+        val message: String? = null,
+        val isInitial: Boolean = false,
+        val asDialog: Boolean = false,
+        /** 先展示当前源失败原因，再切源 */
+        val errorNotice: Boolean = false,
+        val switchNotice: Boolean = false,
+        val fromSource: String? = null,
+        val toSource: String? = null,
+        val failKind: IptvSourceFailKind? = null,
+        val toFailKind: IptvSourceFailKind? = null,
+    ) : LeanbackMainUiState
     data class Error(val message: String? = null) : LeanbackMainUiState
     data class Ready(
         val iptvGroupList: IptvGroupList = IptvGroupList(),

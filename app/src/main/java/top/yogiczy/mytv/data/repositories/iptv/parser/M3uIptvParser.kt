@@ -64,6 +64,11 @@ class M3uIptvParser : IptvParser {
                 val name = line.split(",").lastOrNull() ?: "未知频道"
                 val channelName = Regex("""tvg-name=\"(.+?)\"""").find(line)?.groupValues?.get(1) ?: name
                 val groupName = Regex("""group-title=\"(.+?)\"""").find(line)?.groupValues?.get(1) ?: "其他"
+                // tvg-logo="http://..." 或 tvg-logo=http://...（无引号）
+                val logoUrl = Regex("""tvg-logo\s*=\s*"([^"]+)"""")
+                    .find(line)?.groupValues?.get(1)
+                    ?: Regex("""tvg-logo\s*=\s*([^\s,",]+)""")
+                        .find(line)?.groupValues?.get(1)
                     
                 // 从 EXTINF 行中也可能有 user-agent 和 referer
                 val inlineUserAgent = Regex("""http-user-agent=\"(.+?)\"""").find(line)?.groupValues?.get(1)
@@ -82,6 +87,7 @@ class M3uIptvParser : IptvParser {
                         channelName = channelName.trim(),
                         groupName = groupName.trim(),
                         url = url,
+                        logoUrl = logoUrl?.trim()?.takeIf { it.isNotBlank() },
                         userAgent = inlineUserAgent ?: currentUserAgent ?: extractedUserAgent,
                         referer = inlineReferer ?: currentReferer,
                     )
@@ -104,6 +110,7 @@ class M3uIptvParser : IptvParser {
                         Iptv(
                             name = nameEntry.key,
                             channelName = nameEntry.value.first().channelName,
+                            logoUrl = nameEntry.value.first().logoUrl,
                             urlList = nameEntry.value.map { it.url },
                             userAgent = nameEntry.value.first().userAgent,
                             referer = nameEntry.value.first().referer,
@@ -171,6 +178,7 @@ class M3uIptvParser : IptvParser {
         val channelName: String,
         val groupName: String,
         val url: String,
+        val logoUrl: String? = null,
         val userAgent: String? = null,
         val referer: String? = null,
     )

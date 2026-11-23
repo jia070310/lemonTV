@@ -143,7 +143,7 @@ private fun LeanbackSettingsCategoryHttpPreview() {
 }
 
 @Composable
-private fun LeanbackSettingsVideoPlayerUAHistoryDialog(
+internal fun LeanbackSettingsVideoPlayerUAHistoryDialog(
     modifier: Modifier = Modifier,
     showDialogProvider: () -> Boolean = { false },
     onDismissRequest: () -> Unit = {},

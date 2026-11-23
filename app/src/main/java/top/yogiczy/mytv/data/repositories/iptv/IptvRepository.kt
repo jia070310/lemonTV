@@ -10,6 +10,7 @@ import top.yogiczy.mytv.data.entities.IptvGroup
 import top.yogiczy.mytv.data.entities.IptvGroupList
 import top.yogiczy.mytv.data.entities.IptvList
 import top.yogiczy.mytv.data.repositories.FileCacheRepository
+import top.yogiczy.mytv.data.repositories.iptv.parser.DefaultIptvParser
 import top.yogiczy.mytv.data.repositories.iptv.parser.IptvParser
 import top.yogiczy.mytv.data.repositories.iptv.parser.M3uIptvParser
 import top.yogiczy.mytv.data.utils.Constants
@@ -38,7 +39,11 @@ class IptvRepository : FileCacheRepository("iptv.txt") {
      */
     private suspend fun fetchSource(sourceUrl: String, forceRefresh: Boolean = false) =
         withContext(Dispatchers.IO) {
-            val candidates = Constants.iptvSourceFallbackUrls(sourceUrl, SP.githubProxy)
+            val candidates = Constants.iptvSourceFallbackUrls(
+                sourceUrl,
+                SP.githubProxy,
+                rewriteProxy = SP.githubProxyEnabled,
+            )
             log.d("获取远程直播源: $sourceUrl, 候选=${candidates.size}, 强制刷新: $forceRefresh")
 
             // 超时要短：加速器挂起时尽快切到备用镜像，避免闪屏卡近一分钟
@@ -55,28 +60,46 @@ class IptvRepository : FileCacheRepository("iptv.txt") {
             }
 
             var lastError: Exception? = null
+            val failKinds = mutableListOf<IptvSourceFailKind>()
             for (candidate in candidates) {
                 try {
                     val content = downloadSource(client, candidate, forceRefresh)
-                    // 空壳 #EXTM3U（例如部分 jsDelivr 节点缓存失效）视为失败
-                    if (content.trim().length < 64) {
-                        throw Exception("直播源内容过短，可能镜像失效")
-                    }
+                    validatePlaylistContent(content)
                     log.i("下载完成($candidate)，内容长度: ${content.length} 字符，行数: ${content.lines().size}")
                     return@withContext content
                 } catch (ex: Exception) {
                     lastError = ex
+                    val kind = ex.iptvFailKind()
+                    failKinds += kind
                     log.w("候选源失败: $candidate -> ${ex.message}")
+                    // 已拉到正文但判定为源文件错误：不要再试其它镜像
+                    if (kind == IptvSourceFailKind.Empty) {
+                        throw if (ex is IptvSourceLoadException) {
+                            ex
+                        } else {
+                            IptvSourceLoadException(kind, "源文件错误", ex)
+                        }
+                    }
                 }
             }
 
             log.e("获取远程直播源失败", lastError)
-            val hint = if (candidates.any { Constants.usesGithubProxy(it, SP.githubProxy) }) {
-                "获取远程直播源失败，加速器可能不可用，请在后台设置修改加速器"
-            } else {
-                "获取远程直播源失败，请检查网络连接"
+            val kind = when {
+                failKinds.any { it == IptvSourceFailKind.Empty } -> IptvSourceFailKind.Empty
+                failKinds.isNotEmpty() && failKinds.all { it == IptvSourceFailKind.Timeout } ->
+                    IptvSourceFailKind.Timeout
+                else -> IptvSourceFailKind.FetchFailed
             }
-            throw Exception(hint, lastError)
+            val hint = when (kind) {
+                IptvSourceFailKind.Timeout -> "源链接连接超时"
+                IptvSourceFailKind.Empty -> "源文件错误"
+                else -> if (candidates.any { Constants.usesGithubProxy(it, SP.githubProxy) }) {
+                    "获取远程直播源失败，加速器可能不可用，请在后台设置修改加速器"
+                } else {
+                    "获取远程直播源失败，请检查网络连接"
+                }
+            }
+            throw IptvSourceLoadException(kind, hint, lastError)
         }
 
     private fun downloadSource(
@@ -84,7 +107,14 @@ class IptvRepository : FileCacheRepository("iptv.txt") {
         sourceUrl: String,
         forceRefresh: Boolean,
     ): String {
-        val requestBuilder = Request.Builder().url(sourceUrl)
+        // 强制刷新时加时间戳，尽量绕过加速器/CDN 对 raw 的旧缓存
+        val requestUrl = if (forceRefresh) {
+            val sep = if (sourceUrl.contains("?")) "&" else "?"
+            "$sourceUrl${sep}_t=${System.currentTimeMillis()}"
+        } else {
+            sourceUrl
+        }
+        val requestBuilder = Request.Builder().url(requestUrl)
 
         val host = try {
             Uri.parse(sourceUrl).host ?: ""
@@ -132,6 +162,29 @@ class IptvRepository : FileCacheRepository("iptv.txt") {
     }
 
     /**
+     * 校验拉取到的正文。
+     * - 空内容 / 纯数字等垃圾：Empty（不要再试 CDN 旧镜像）
+     * - 加速器返回的 HTML 错误页：FetchFailed（允许继续试备用地址）
+     */
+    private fun validatePlaylistContent(content: String) {
+        val trimmed = content.trim()
+        if (trimmed.isBlank() || trimmed.length < 16) {
+            throw IptvSourceLoadException(IptvSourceFailKind.Empty, "直播源文件没有频道")
+        }
+        if (trimmed.startsWith("<") ||
+            trimmed.contains("<html", ignoreCase = true) ||
+            trimmed.contains("<!doctype", ignoreCase = true)
+        ) {
+            throw IptvSourceLoadException(IptvSourceFailKind.FetchFailed, "直播源返回了错误页面")
+        }
+        val looksLikeM3u = trimmed.startsWith("#EXTM3U") || trimmed.contains("#EXTINF")
+        val looksLikeTvbox = trimmed.contains("#genre#")
+        if (!looksLikeM3u && !looksLikeTvbox) {
+            throw IptvSourceLoadException(IptvSourceFailKind.Empty, "直播源文件没有频道")
+        }
+    }
+
+    /**
      * 获取直播源分组列表
      */
     suspend fun getIptvGroupList(
@@ -143,15 +196,38 @@ class IptvRepository : FileCacheRepository("iptv.txt") {
         try {
             val sourceData = if (forceRefresh) {
                 log.i("强制刷新直播源：$sourceUrl")
-                // 调用父类的 forceRefresh 方法，并传入 forceRefresh=true 绕过 HTTP 缓存
                 this.forceRefresh { fetchSource(sourceUrl, forceRefresh = true) }
             } else {
+                // 本地缓存若已不是合法 m3u（例如远端已改成垃圾数据），丢掉重拉，
+                // 避免「覆盖安装 / 未清数据」仍用旧 iptv.txt 假装能播。
                 getOrRefresh(cacheTime) {
                     fetchSource(sourceUrl, forceRefresh = false)
+                }.also { cached ->
+                    try {
+                        validatePlaylistContent(cached)
+                    } catch (ex: IptvSourceLoadException) {
+                        if (ex.kind == IptvSourceFailKind.Empty) {
+                            log.w("本地缓存不是可用 m3u，清除后重新拉取")
+                            clearCache()
+                            return@getIptvGroupList getIptvGroupList(
+                                sourceUrl = sourceUrl,
+                                cacheTime = cacheTime,
+                                simplify = simplify,
+                                forceRefresh = true,
+                            )
+                        }
+                        throw ex
+                    }
                 }
             }
+            // 解析前再校验一次
+            validatePlaylistContent(sourceData)
 
-            val parser = IptvParser.instances.first { it.isSupport(sourceUrl, sourceData) }
+            val parser = IptvParser.instances.firstOrNull { it.isSupport(sourceUrl, sourceData) }
+                ?: throw IptvSourceLoadException(IptvSourceFailKind.Empty, "直播源文件没有频道")
+            if (parser is DefaultIptvParser) {
+                throw IptvSourceLoadException(IptvSourceFailKind.Empty, "直播源文件没有频道")
+            }
             val groupList = parser.parse(sourceData)
             
             // 如果是 M3U 解析器，保存提取的元数据
@@ -171,7 +247,11 @@ class IptvRepository : FileCacheRepository("iptv.txt") {
                 }
             }
             
-            log.i("解析直播源完成：${groupList.size}个分组，${groupList.flatMap { it.iptvList }.size}个频道")
+            val playableChannels = groupList.flatMap { it.iptvList }.filter { it.urlList.isNotEmpty() }
+            log.i("解析直播源完成：${groupList.size}个分组，${playableChannels.size}个可播放频道")
+            if (playableChannels.isEmpty()) {
+                throw IptvSourceLoadException(IptvSourceFailKind.Empty, "直播源文件没有频道")
+            }
 
             if (simplify) {
                 return IptvGroupList(groupList.map { group ->
@@ -184,9 +264,12 @@ class IptvRepository : FileCacheRepository("iptv.txt") {
             }
 
             return groupList
+        } catch (ex: IptvSourceLoadException) {
+            log.e("获取直播源失败: ${ex.kind}", ex)
+            throw ex
         } catch (ex: Exception) {
             log.e("获取直播源失败", ex)
-            throw Exception(ex)
+            throw IptvSourceLoadException(ex.iptvFailKind(), ex.message ?: "获取直播源失败", ex)
         }
     }
 }

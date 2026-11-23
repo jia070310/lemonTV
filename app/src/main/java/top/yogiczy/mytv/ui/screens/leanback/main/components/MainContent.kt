@@ -76,57 +76,27 @@ fun LeanbackMainContent(
         }
     )
     
-    // 智能源切换管理器
-    val sourceFailureTracker = remember { mutableSetOf<String>() }
-    
-    // 源切换回调（延迟初始化，避免循环依赖）
-    var onSourceSwitchRequiredCallback: ((String) -> Unit)? = null
-    
     val mainContentState = rememberLeanbackMainContentState(
         videoPlayerState = videoPlayerState,
         iptvGroupList = iptvGroupList,
-        onSourceSwitchRequired = { currentSourceUrl ->
-            onSourceSwitchRequiredCallback?.invoke(currentSourceUrl)
+        onChannelsUnplayable = {
+            // 连续 3 个频道播不通：提示直播源链接失效，再切换源（勾选同步到新源）
+            mainViewModel?.handleUnplayableChannels { nextSource ->
+                settingsViewModel.iptvSourceUrl = nextSource
+            }
+        },
+        onSourceRejected = {
+            // 列表为空 / 非 m3u：提示源文件错误，再切换源
+            mainViewModel?.rejectCurrentSource(
+                top.yogiczy.mytv.data.repositories.iptv.IptvSourceFailKind.Empty,
+            ) { nextSource ->
+                settingsViewModel.iptvSourceUrl = nextSource
+            }
+        },
+        onPlaybackSucceeded = {
+            mainViewModel?.clearCurrentSourceFailure()
         },
     )
-    
-    // 初始化源切换回调
-    onSourceSwitchRequiredCallback = { currentSourceUrl ->
-        // 当前源失败率过高，自动切换到下一个源
-        coroutineScope.launch {
-            val allSources = SP.getIptvSourceList()
-            val currentIndex = allSources.indexOf(currentSourceUrl)
-            
-            // 记录失败的源
-            sourceFailureTracker.add(currentSourceUrl)
-            
-            // 查找下一个未失败的源
-            var nextSource: String? = null
-            for (i in 1 until allSources.size) {
-                val candidateIndex = (currentIndex + i) % allSources.size
-                val candidate = allSources[candidateIndex]
-                if (!sourceFailureTracker.contains(candidate)) {
-                    nextSource = candidate
-                    break
-                }
-            }
-            
-            if (nextSource != null) {
-                // 找到可用源，自动切换
-                LeanbackToastState.I.showToast("当前源播放失败率过高，正在自动切换到下一个源...")
-                android.util.Log.i("MainContent", "自动切换源：$currentSourceUrl -> $nextSource")
-                delay(1500)
-                settingsViewModel.iptvSourceUrl = nextSource
-                mainContentState.resetFailureTracking()
-                mainViewModel?.refresh()
-            } else {
-                // 所有源都失败了
-                LeanbackToastState.I.showToast("所有直播源均无法播放，请更新直播源或添加新源")
-                android.util.Log.w("MainContent", "所有源都已尝试失败")
-                sourceFailureTracker.clear()
-            }
-        }
-    }
     val panelChannelNoSelectState = rememberLeanbackPanelChannelNoSelectState(
         onChannelNoConfirm = {
             val channelNo = it.toInt() - 1
@@ -349,6 +319,7 @@ fun LeanbackMainContent(
                 onClearCache = {
                     settingsViewModel.iptvPlayableHostList = emptySet()
                     coroutineScope.launch {
+                        top.yogiczy.mytv.data.repositories.iptv.ChannelLogoCache.clear()
                         AppGlobal.cacheDir.deleteRecursively()
                     }
                     LeanbackToastState.I.showToast("缓存已清除，请重启应用")
@@ -362,8 +333,6 @@ fun LeanbackMainContent(
                     settingsViewModel.iptvSourceUrl = url
                     mainContentState.isQuickPanelVisible = false
                     LeanbackToastState.I.showToast("正在切换直播源...")
-                    // 手动切换源，清除失败记录
-                    sourceFailureTracker.clear()
                     mainContentState.resetFailureTracking()
                     mainViewModel?.refresh()
                 },
@@ -380,8 +349,6 @@ fun LeanbackMainContent(
                     // 直播源或节目单变更后，关闭设置并刷新主界面
                     mainContentState.isSettingsVisible = false
                     android.util.Log.i("MainContent", "mainViewModel: $mainViewModel")
-                    // 手动切换源，清除失败记录
-                    sourceFailureTracker.clear()
                     mainContentState.resetFailureTracking()
                     mainViewModel?.refresh()
                     android.util.Log.i("MainContent", "已调用 mainViewModel.refresh()")

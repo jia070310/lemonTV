@@ -45,6 +45,7 @@ import top.yogiczy.mytv.data.entities.EpgProgrammeCurrent
 import top.yogiczy.mytv.data.entities.Iptv
 import top.yogiczy.mytv.data.entities.IptvGroup
 import top.yogiczy.mytv.data.entities.IptvList
+import top.yogiczy.mytv.ui.screens.leanback.components.LeanbackChannelLogo
 import top.yogiczy.mytv.ui.theme.LeanbackTheme
 import top.yogiczy.mytv.ui.utils.handleLeanbackKeyEvents
 import kotlin.math.max
@@ -105,7 +106,7 @@ fun LeanbackClassicPanelIptvList(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier
             .fillMaxHeight()
-            .width(220.dp)
+            .width(248.dp)
             .background(MaterialTheme.colorScheme.background.copy(0.8f)),
     ) {
         itemsIndexed(iptvList, key = { _, iptv -> iptv.hashCode() }) { index, iptv ->
@@ -209,6 +210,14 @@ private fun LeanbackClassicPanelIptvItem(
                 ),
                 selected = isSelectedProvider(),
                 onClick = { },
+                leadingContent = {
+                    LeanbackChannelLogo(
+                        name = iptv.name,
+                        channelName = iptv.channelName,
+                        size = 36.dp,
+                        showPlaceholder = true,
+                    )
+                },
                 headlineContent = {
                     Text(text = iptv.name, maxLines = 2)
                 },
